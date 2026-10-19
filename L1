@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>SOP Cheat Sheet</title>
+  <style>
+    :root { 
+      --bg: #121212; --sidebar: #181818; --card: #1e1e1e; 
+      --text: #e0e0e0; --muted: #888; --accent: #4caf50; --border: #2e2e2e; 
+    }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, monospace; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
+    
+    .sidebar { width: 270px; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 16px; overflow-y: auto; flex-shrink: 0; }
+    .sidebar h2 { font-size: 16px; margin: 0 0 12px 0; color: var(--accent); }
+    .nav-section { font-size: 11px; text-transform: uppercase; color: var(--muted); margin: 16px 0 6px 0; font-weight: bold; }
+    .nav-btn { background: transparent; color: var(--text); border: none; text-align: left; padding: 7px 10px; border-radius: 5px; cursor: pointer; font-size: 12.5px; width: 100%; text-decoration: none; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .nav-btn:hover, .nav-btn.active { background: #262626; color: var(--accent); }
+
+    .main { flex: 1; padding: 24px 32px; overflow-y: auto; scroll-behavior: smooth; }
+    .container { max-width: 920px; margin: 0 auto; }
+
+    #search { position: sticky; top: 0; width: 100%; padding: 12px 14px; font-size: 15px; background: #222; color: #fff; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 24px; z-index: 10; }
+    #search:focus { outline: 1px solid var(--accent); }
+
+    .snippet { background: var(--card); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 20px; overflow: hidden; }
+    .snippet-header { display: flex; justify-content: space-between; align-items: center; background: #252525; padding: 8px 14px; border-bottom: 1px solid var(--border); }
+    .snippet-title { font-weight: bold; font-size: 13.5px; color: #81c784; }
+    .snippet-cat { font-size: 11px; color: var(--muted); margin-left: 8px; font-weight: normal; }
+    .copy-btn { background: #333; color: #fff; border: 1px solid #444; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+    .copy-btn:hover { background: var(--accent); border-color: var(--accent); color: #000; font-weight: bold; }
+    
+    pre { margin: 0; padding: 14px; overflow-x: auto; font-size: 13px; line-height: 1.45; color: #d4d4d4; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <aside class="sidebar">
+    <h2>SOP // POSIX C</h2>
+    <div class="nav-section">Kategorie</div>
+    <div id="cat-list"></div>
+    <div class="nav-section">Szybki skok</div>
+    <div id="jump-list"></div>
+  </aside>
+
+  <main class="main">
+    <div class="container">
+      <input type="text" id="search" placeholder="Szukaj funkcji, makra lub tagu (np. getopt, readdir, lstat, symlink)..." autofocus>
+      <div id="snippets-container"></div>
+    </div>
+  </main>
+
+  <script>
+    // =========================================================================
+    // === BAZA DANYCH KLOCKÓW (TUTAJ DOKLEJASZ NOWE ELEMENTY PRZEZ PRZECINEK) ===
+    // =========================================================================
+    const SNIPPETS = [
+  // =========================================================================
+  // 1. BIBLIOTEKI I MAKRA
+  // =========================================================================
+  {
+    id: "headers-list",
+    cat: "1. Biblioteki",
+    title: "Wszystkie nagłówki do Lab 1 + Makro ERR",
+    tags: "biblioteki include naglowki err makro xopen_source gnu_source",
+    code: `// Makra odblokowujace standard POSIX (strdup, lstat, getopt, nftw) - ZAWSZE NA SAMEJ GORZE!
+#define _XOPEN_SOURCE 700
+#define _GNU_SOURCE
+
+#include <stdio.h>      // FILE*, fopen, fclose, fread, fwrite, fseek, ftell, fprintf, printf, perror, snprintf, fgets
+#include <stdlib.h>     // malloc, free, exit, EXIT_SUCCESS, EXIT_FAILURE, strtol, rand, srand
+#include <unistd.h>     // chdir, getcwd, access, unlink, symlink, link, getopt, optarg, optind, sleep
+#include <dirent.h>     // DIR*, struct dirent, opendir, readdir, closedir
+#include <sys/stat.h>   // struct stat, stat, lstat, mkdir, chmod, umask, makra S_ISDIR, S_ISREG, S_ISLNK
+#include <sys/types.h>  // Typy systemowe: mode_t, ino_t, off_t, ssize_t, pid_t
+#include <string.h>     // strcmp, strncmp, strcpy, strcat, strlen, strchr, strrchr, strstr, strdup, memcpy, memset
+#include <errno.h>      // Zmienna globalna errno oraz stale bledow: ENOENT, EACCES, EEXIST, EINTR
+#include <fcntl.h>      // Flagi niskopoziomowe O_RDONLY, O_WRONLY, O_CREAT (przydatne tez przy atrybutach)
+#include <time.h>       // time() - do inicjalizacji ziarna srand(time(NULL))
+#include <ftw.h>        // nftw() - automatyczne rekurencyjne przechodzenie drzewa katalogow
+
+// Standardowe makro obslugi bledow krytycznych z laboratorium
+#define ERR(source) (perror(source), fprintf(stderr, "%s:%d\\n", __FILE__, __LINE__), exit(EXIT_FAILURE))`
+  },
+
+  // =========================================================================
+  // 2. CHARY ZMIENIALNE I NIE, WSKAŹNIKI I PAMIĘĆ
+  // =========================================================================
+  {
+    id: "chars-mutability",
+    cat: "2. Chary i Wskaźniki",
+    title: "Pamięć edytowalna vs nieedytowalna (char* vs char[])",
+    tags: "char wskazniki tablice segfault literal optarg const",
+    code: `// 1. NIEEDYTOWALNE (Read-Only Data Segment - próba modyfikacji = SEGFAULT!):
+char *s1 = "tekst staly";
+// s1[0] = 'T';           // BŁĄD! Segmentation fault!
+// strcat(s1, " cos");    // BŁĄD! Segmentation fault!
+
+// 2. EDYTOWALNE NA STOSIE (Automatyczna tablica o znanym rozmiarze):
+char buf[256] = "tekst";
+buf[0] = 'T';             // OK!
+snprintf(buf, sizeof(buf), "%s/%s", "katalog", "plik.txt"); // OK!
+
+// 3. EDYTOWALNE Z ARGUMENTÓW (argv / optarg):
+// Pamiec z argv[] i optarg JEST edytowalna, ale ma rozmiar dokladnie taki jak podany argument!
+char *arg = optarg;       // np. uzytkownik podal "-i pakiet==1.0"
+char *eq = strstr(arg, "==");
+if (eq != NULL) {
+    *eq = '\\0';           // OK! Mozna bezpiecznie przeciąć stringa w miejscu '=='
+    char *ver = eq + 2;   // Wskazuje na "1.0"
+}
+// UWAGA: Nie wolno robic strcat(optarg, "dlugi_tekst"), bo wyjdziesz poza bufor argv!
+
+// 4. TABLICA WSKAŹNIKÓW (np. lista ścieżek z flagi -p lub -v):
+char *folders[10];        // Tablica na 10 wskaźników typu char*
+int count = 0;
+folders[count++] = optarg; // Zapisuje sam adres (wskaźnik) do istniejącego optarg`
+  },
+  {
+    id: "malloc-strdup",
+    cat: "2. Chary i Wskaźniki",
+    title: "Dynamiczna alokacja napisów (malloc, strdup, free)",
+    tags: "malloc free strdup alokacja sterta kopiowanie",
+    code: `/* =========================================================================
+ * 1. void *malloc(size_t size)
+ *    - Co robi: Alokuje 'size' bajtow niezainicjalizowanej pamieci na stercie.
+ *    - Argumenty: size - liczba bajtow (dla stringa zawsze: strlen(str) + 1 na znak '\\0'!).
+ *    - Zwraca: Wskaznik do zaalokowanej pamieci.
+ *    - Blad: Zwraca NULL i ustawia errno = ENOMEM.
+ *
+ * 2. char *strdup(const char *s)
+ *    - Co robi: Automatycznie robi malloc(strlen(s) + 1) i kopiuje string 's'.
+ *    - Argumenty: s - zrodlowy lancuch znakow zakonczony '\\0'.
+ *    - Zwraca: Wskaznik na nowo zaalokowana kopie napisu (wymaga pozniejszego free!).
+ *    - Blad: Zwraca NULL i ustawia errno = ENOMEM.
+ *
+ * 3. void free(void *ptr)
+ *    - Co robi: Zwalnia pamiec zaalokowana przez malloc / calloc / realloc / strdup.
+ *    - Argumenty: ptr - wskaznik z malloc/strdup (jesli ptr == NULL, funkcja nic nie robi).
+ *    - Zwraca: nic (void), nie ustawia bledow.
+ * ========================================================================= */
+
+// Przyklad 1: Bezpieczne kopiowanie przez strdup
+char *copy = strdup(optarg);
+if (copy == NULL) ERR("strdup");
+// ... uzycie copy ...
+free(copy);
+
+// Przyklad 2: Reczna alokacja na zlaczenie dwoch napisow
+size_t len = strlen(dir) + 1 + strlen(file) + 1; // +1 na '/' oraz +1 na '\\0'
+char *full_path = malloc(len);
+if (full_path == NULL) ERR("malloc");
+snprintf(full_path, len, "%s/%s", dir, file);
+// ... uzycie full_path ...
+free(full_path);`
+  },
+
+  // =========================================================================
+  // 3. OPERACJE NA STRINGACH (<string.h> i <stdio.h>)
+  // =========================================================================
+  {
+    id: "string-compare-len",
+    cat: "3. Stringi",
+    title: "Porównywanie i długość (strlen, strcmp, strncmp)",
+    tags: "strlen strcmp strncmp dlugosc porownanie kropki",
+    code: `/* =========================================================================
+ * 1. size_t strlen(const char *s)
+ *    - Co robi: Oblicza dlugosc napisu BEZ znaku konca '\\0'.
+ *    - Argumenty: s - poprawny wskaznik na string (podanie NULL = SEGFAULT!).
+ *    - Zwraca: Liczba znakow poprzedzajacych '\\0'. Nie zwraca bledow.
+ *
+ * 2. int strcmp(const char *s1, const char *s2)
+ *    - Co robi: Porownuje leksykograficznie dwa napisy znak po znaku.
+ *    - Argumenty: s1, s2 - wskazniki na stringi (podanie NULL w ktorymkolwiek = SEGFAULT!).
+ *    - Zwraca:
+ *        0   -> napisy sa IDENTYCZNE!
+ *       < 0  -> s1 jest mniejsze od s2
+ *       > 0  -> s1 jest wieksze od s2
+ *
+ * 3. int strncmp(const char *s1, const char *s2, size_t n)
+ *    - Co robi: Porownuje co najwyzej pierwszych 'n' znakow obu napisow.
+ *    - Argumenty: s1, s2 - napisy; n - maksymalna liczba porownywanych bajtow.
+ *    - Zwraca: 0 gdy pierwsze 'n' znakow jest identyczne, <0 lub >0 wpp.
+ * ========================================================================= */
+
+if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0) {
+    // Napis jest kropka lub dwiema kropkami
+}
+
+// Bezpieczne porownanie, gdy wskaznik moze byc NULL:
+if (ext != NULL && extpnt != NULL && strcmp(extpnt, ext) == 0) {
+    // Rozszerzenia sa identyczne
+}`
+  },
+  {
+    id: "string-search",
+    cat: "3. Stringi",
+    title: "Wyszukiwanie w napisach (strchr, strrchr, strstr)",
+    tags: "strchr strrchr strstr szukanie rozszerzenie kropka podciag",
+    code: `/* =========================================================================
+ * 1. char *strchr(const char *s, int c)
+ *    - Co robi: Szuka PIERWSZEGO wystapienia znaku 'c' (od lewej) w napisie 's'.
+ *    - Argumenty: s - przeszukiwany string; c - szukany znak (np. '.').
+ *    - Zwraca: Wskaznik na znaleziony znak wewnatrz 's' lub NULL, gdy znaku nie ma.
+ *
+ * 2. char *strrchr(const char *s, int c)
+ *    - Co robi: Szuka OSTATNIEGO wystapienia znaku 'c' (od prawej) w napisie 's'.
+ *      Idealne do wyciagania rozszerzenia pliku!
+ *    - Argumenty: s - nazwa pliku/sciezka; c - szukany znak (np. '.' lub '/').
+ *    - Zwraca: Wskaznik na ostatnie wystapienie znaku lub NULL, gdy znaku nie ma.
+ *
+ * 3. char *strstr(const char *haystack, const char *needle)
+ *    - Co robi: Szuka pierwszego wystapienia calego podciagu 'needle' w 'haystack'.
+ *    - Argumenty: haystack - tekst przeszukiwany; needle - szukany podciag (np. "==").
+ *    - Zwraca: Wskaznik na poczatek znalezionego podciagu w 'haystack' lub NULL.
+ * ========================================================================= */
+
+// Przyklad 1: Wyciaganie rozszerzenia pliku (z pominieciem ukrytych plikow typu ".bashrc")
+char *ext = strrchr(dp->d_name, '.');
+if (ext != NULL && ext != dp->d_name) {
+    // ext wskazuje na ".txt" (razem z kropka)
+    // ext + 1 wskazuje na samo "txt" (bez kropki)
+}
+
+// Przyklad 2: Rozdzielanie "numpy==1.0.0" na nazwe i wersje
+char *sep = strstr(optarg, "==");
+if (sep == NULL) usage(argv[0]); // Brak "==" w napisie
+*sep = '\\0';                     // Zamienia pierwsze '=' na koniec stringa
+char *pkg_name = optarg;         // "numpy"
+char *pkg_ver  = sep + 2;        // "1.0.0"`
+  },
+  {
+    id: "string-format-copy",
+    cat: "3. Stringi",
+    title: "Formatowanie i kopiowanie (snprintf, strcpy, strcat, sscanf)",
+    tags: "snprintf sprintf strcpy strncpy strcat sscanf",
+    code: `/* =========================================================================
+ * 1. int snprintf(char *str, size_t size, const char *format, ...)
+ *    - Co robi: Zapisuje sformatowany tekst do bufora 'str', gwarantujac brak
+ *      przepelnienia bufora (zapisze max size-1 znakow i zawsze doda '\\0').
+ *    - Argumenty: str - docelowy bufor; size - rozmiar bufora (sizeof(str)); format - jak w printf.
+ *    - Zwraca: Liczba znakow, ktora zostalaby zapisana (bez '\\0'), gdyby bufor byl nieskonczony.
+ *    - Blad: Wartosc < 0 oznacza blad kodowania; wartosc >= size oznacza ucięcie ścieżki (truncation)!
+ *
+ * 2. char *strcpy(char *dest, const char *src)
+ *    - Co robi: Kopiuje string 'src' (wraz z '\\0') do bufora 'dest'.
+ *    - Argumenty: dest - MUSI byc edytowalnym buforem o wystarczajacym rozmiarze!
+ *    - Zwraca: Wskaznik 'dest'.
+ *
+ * 3. char *strcat(char *dest, const char *src)
+ *    - Co robi: Dokleja string 'src' na koniec stringa znajdujacego sie w 'dest'.
+ *    - Argumenty: dest - bufor zawierajacy juz poprawny string z miejscem na dopisanie 'src'.
+ *    - Zwraca: Wskaznik 'dest'.
+ *
+ * 4. int sscanf(const char *str, const char *format, ...)
+ *    - Co robi: Parsuje dane z napisu 'str' wedlug formatu (np. wyciaga slowa z linii).
+ *    - Zwraca: Liczba poprawnie wczytanych i przypisanych elementow (lub EOF).
+ * ========================================================================= */
+
+// Bezpieczne sklejanie sciezek przez snprintf (ZAMIAST strcpy + strcat!):
+char path[512];
+int n = snprintf(path, sizeof(path), "%s/%s", dir_name, file_name);
+if (n < 0 || (size_t)n >= sizeof(path)) ERR("snprintf: path truncated");
+
+// Wyciaganie nazwy pakietu i wersji z linii "numpy 1.0.0\\n":
+char pkg[128], ver[128];
+if (sscanf(line, "%127s %127s", pkg, ver) == 2) {
+    // Poprawnie wczytano oba slowa
+}`
+  },
+
+  // =========================================================================
+  // 4. KATALOGI I METADANE (DIR, dirent, stat, lstat)
+  // =========================================================================
+  {
+    id: "dir-functions",
+    cat: "4. Katalogi i stat",
+    title: "Obsługa katalogów (opendir, readdir, closedir)",
+    tags: "dir dirent opendir readdir closedir d_name d_ino errno",
+    code: `/* =========================================================================
+ * 1. DIR *opendir(const char *name)
+ *    - Co robi: Otwiera strumien katalogu wskazany sciezka 'name' i ustawia go na 1. wpisie.
+ *    - Argumenty: name - sciezka do katalogu (np. ".", "/var", "library").
+ *    - Zwraca: Wskaznik typu DIR* (uchwyt strumienia katalogu).
+ *    - Blad: Zwraca NULL i ustawia errno (np. ENOENT - brak katalogu, EACCES - brak praw, ENOTDIR).
+ *
+ * 2. struct dirent *readdir(DIR *dirp)
+ *    - Co robi: Zwraca wskaznik na strukture opisujaca kolejny wpis w katalogu i przesuwa kursor.
+ *    - Argumenty: dirp - otwarty strumien z opendir().
+ *    - Pola struct dirent (wg POSIX):
+ *        char d_name[]  -> nazwa pliku/katalogu (SAMA NAZWA, bez sciezki!)
+ *        ino_t d_ino    -> numer i-wezla (inode) pliku
+ *    - Zwraca: Wskaznik struct dirent* lub NULL.
+ *    - Blad vs Koniec katalogu: Zwraca NULL zarowno na koncu katalogu, jak i przy bledzie!
+ *      DLATEGO: Przed kazdym wywolaniem ustaw errno = 0. Jesli zwroci NULL i errno != 0 -> BLAD!
+ *
+ * 3. int closedir(DIR *dirp)
+ *    - Co robi: Zamyka strumien katalogu i zwalnia powiazana pamiec oraz deskryptor.
+ *    - Argumenty: dirp - uchwyt z opendir().
+ *    - Zwraca: 0 w przypadku sukcesu.
+ *    - Blad: Zwraca -1 i ustawia errno (np. EBADF).
+ * ========================================================================= */
+
+DIR *dirp = opendir(path);
+if (dirp == NULL) ERR("opendir");
+
+struct dirent *dp;
+while (1) {
+    errno = 0; // OBOWIĄZKOWE przed każdym readdir!
+    dp = readdir(dirp);
+    if (dp == NULL) {
+        if (errno != 0) ERR("readdir");
+        break; // Normalny koniec katalogu
+    }
+    if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)
+        continue; // Pomijamy kropki!
+
+    printf("Znaleziono wpis: %s\\n", dp->d_name);
+}
+
+if (closedir(dirp) == -1) ERR("closedir");`
+  },
+  {
+    id: "stat-lstat-info",
+    cat: "4. Katalogi i stat",
+    title: "Metadane plików (stat, lstat, struct stat, makra S_IS*)",
+    tags: "stat lstat fstat struct st_mode st_size s_isdir s_isreg s_islnk",
+    code: `/* =========================================================================
+ * 1. int stat(const char *restrict path, struct stat *restrict buf)
+ *    - Co robi: Pobiera metadane pliku wskazanego przez 'path' i zapisuje je do '*buf'.
+ *      PODĄŻA za dowiązaniami symbolicznymi (bada plik docelowy, na który wskazuje link!).
+ *
+ * 2. int lstat(const char *restrict path, struct stat *restrict buf)
+ *    - Co robi: Identycznie jak stat(), ale NIE PODĄŻA za symlinkami – jeśli 'path' to
+ *      symlink, zwraca informacje o samym linku (typ S_ISLNK, rozmiar samej ścieżki).
+ *      NA LABACH ZAWSZE DOMYŚLNIE UŻYWAJ lstat()!
+ *
+ * Argumenty obu funkcji:
+ *    - path: ścieżka do badanego pliku (UWAGA: jeśli nie zrobiłeś chdir() do przeglądanego
+ *            katalogu, musisz skleić ścieżkę "katalog/d_name", bo samo dp->d_name nie zadziała!).
+ *    - buf:  wskaźnik na zaalokowaną strukturę 'struct stat' (np. &filestat).
+ * Zwraca: 0 w razie sukcesu.
+ * Błąd:   Zwraca -1 i ustawia errno (ENOENT, EACCES, ENOTDIR, ELOOP).
+ *
+ * Najważniejsze pola 'struct stat':
+ *    - mode_t  st_mode   -> typ pliku oraz bity uprawnień (rwx)
+ *    - off_t   st_size   -> rozmiar pliku w bajtach (rzutuj na (long) przy printf "%ld")
+ *    - ino_t   st_ino    -> numer inode
+ *    - nlink_t st_nlink  -> liczba twardych dowiązań (hardlinks)
+ *    - uid_t   st_uid    -> ID właściciela
+ *    - gid_t   st_gid    -> ID grupy
+ *
+ * Makra sprawdzające typ pliku (przyjmują pole filestat.st_mode):
+ *    - S_ISREG(st.st_mode)  -> niezerowe (true), jeśli to zwykły plik (regular file)
+ *    - S_ISDIR(st.st_mode)  -> niezerowe (true), jeśli to katalog (directory)
+ *    - S_ISLNK(st.st_mode)  -> niezerowe (true), jeśli to link symboliczny (tylko po lstat!)
+ *    - S_ISFIFO(st.st_mode) -> kolejka FIFO / potok nazwany
+ * ========================================================================= */
+
+struct stat st;
+if (lstat(full_path, &st) == -1) {
+    ERR("lstat");
+}
+
+if (S_ISDIR(st.st_mode)) {
+    printf("Katalog: %s\\n", full_path);
+} else if (S_ISREG(st.st_mode)) {
+    printf("Zwykly plik: %s, rozmiar: %ld B\\n", full_path, (long)st.st_size);
+} else if (S_ISLNK(st.st_mode)) {
+    printf("Symlink: %s\\n", full_path);
+}`
+  },
+
+  // =========================================================================
+  // 5. NAWIGACJA KATALOGIEM ROBOCZYM (getcwd, chdir)
+  // =========================================================================
+  {
+    id: "getcwd-chdir",
+    cat: "5. getcwd i chdir",
+    title: "Zmiana i odczyt katalogu roboczego (getcwd, chdir)",
+    tags: "getcwd chdir cwd pwd homedir nawigacja sciezki",
+    code: `/* =========================================================================
+ * 1. char *getcwd(char *buf, size_t size)
+ *    - Co robi: Zapisuje bezwzględną ścieżkę aktualnego katalogu roboczego (CWD)
+ *      procesu do tablicy 'buf'.
+ *    - Argumenty:
+ *        buf  -> zaalokowana tablica znaków (np. char homedir[MAX_PATH])
+ *        size -> rozmiar bufora w bajtach (np. sizeof(homedir))
+ *    - Zwraca: Wskaźnik 'buf' w razie sukcesu.
+ *    - Błąd:   Zwraca NULL i ustawia errno (np. ERANGE gdy bufor jest za mały!).
+ *
+ * 2. int chdir(const char *path)
+ *    - Co robi: Zmienia bieżący katalog roboczy (CWD, czyli ".") procesu na 'path'.
+ *    - Argumenty: path -> ścieżka względna (np. "podfolder", "..") lub bezwzględna ("/var").
+ *    - Zwraca: 0 w razie sukcesu.
+ *    - Błąd:   Zwraca -1 i ustawia errno (ENOENT - nie istnieje, EACCES - brak praw X_OK, ENOTDIR).
+ *
+ * DLACZEGO ZAPAMIĘTUJEMY homedir PRZEZ getcwd()?
+ * Gdy w pętli robisz chdir(folders[i]) dla ścieżek względnych (np. "-p dir1 -p dir2"),
+ * po wejściu do "dir1" proces fizycznie tam zostaje. Bez powrotu przez chdir(homedir)
+ * w kolejnym obrocie pętli szukałby "dir2" WEWNĄTRZ "dir1" (czyli "dir1/dir2")!
+ * ========================================================================= */
+
+char homedir[256];
+if (getcwd(homedir, sizeof(homedir)) == NULL) ERR("getcwd");
+
+for (int i = 0; i < folder_count; i++) {
+    if (chdir(folders[i]) == -1) {
+        perror("chdir"); // Wypisze blad na stderr, ale nie ubije programu
+        continue;
+    }
+
+    // Tutaj "." oznacza wnetrze folders[i] - mozna robic opendir(".") i lstat(dp->d_name)
+
+    if (chdir(homedir) == -1) ERR("chdir back"); // Obowiazkowy powrot do bazy!
+}`
+  },
+
+  // =========================================================================
+  // 6. STRUMIENIE PLIKOWE I EDYCJA PLIKÓW (<stdio.h>, unlink)
+  // =========================================================================
+  {
+    id: "fopen-fclose-modes",
+    cat: "6. Pliki (stdio)",
+    title: "Otwieranie i zamykanie strumieni (fopen, fclose, tryby)",
+    tags: "fopen fclose file tryby r w a r+ w+ a+ stdout stderr",
+    code: `/* =========================================================================
+ * 1. FILE *fopen(const char *restrict pathname, const char *restrict mode)
+ *    - Co robi: Otwiera plik pod ścieżką 'pathname' i wiąże go z buforowanym strumieniem FILE*.
+ *    - Argumenty:
+ *        pathname -> ścieżka do pliku
+ *        mode     -> string określający tryb otwarcia:
+ *          "r"  : tylko ODCZYT. Plik MUSI istnieć (inaczej błąd ENOENT). Kursor na początku.
+ *          "w"  : tylko ZAPIS. Jeśli plik istnieje -> KASUJE JEGO ZAWARTOŚĆ (długość = 0)!
+ *                 Jeśli nie istnieje -> tworzy nowy (z prawami 0666 & ~umask).
+ *          "a"  : DOPISYWANIE (Append). Tworzy plik jeśli nie istnieje. KAŻDY zapis (fprintf/fwrite)
+ *                 ląduje bezwarunkowo na SAMYM KOŃCU pliku (niezależnie od fseek!).
+ *          "r+" : ODCZYT I ZAPIS. Plik MUSI istnieć! Nie kasuje zawartości. Kursor na początku.
+ *          "w+" : ODCZYT I ZAPIS. Kasuje zawartość do zera lub tworzy nowy plik.
+ *          "a+" : ODCZYT I DOPISYWANIE. Czytać można wszędzie (po fseek), ale każdy zapis
+ *                 i tak przestawia kursor na sam koniec pliku.
+ *    - Zwraca: Wskaźnik FILE* w razie sukcesu.
+ *    - Błąd:   Zwraca NULL i ustawia errno.
+ *
+ * 2. int fclose(FILE *stream)
+ *    - Co robi: Opróżnia bufory (flush) i zamyka plik, zwalniając strukturę FILE.
+ *    - Argumenty: stream -> uchwyt z fopen() (NIE ZAMYKAJ standardowego stdout ani stderr!).
+ *    - Zwraca: 0 w razie sukcesu.
+ *    - Błąd:   Zwraca EOF (-1) i ustawia errno.
+ * ========================================================================= */
+
+FILE *f = fopen("dane.txt", "r+");
+if (f == NULL) ERR("fopen");
+
+// ... operacje na pliku ...
+
+if (fclose(f) == EOF) ERR("fclose");`
+  },
+  {
+    id: "fseek-ftell-rewind",
+    cat: "6. Pliki (stdio)",
+    title: "Pozycjonowanie kursora w pliku (fseek, ftell, rewind)",
+    tags: "fseek ftell rewind seek_set seek_cur seek_end rozmiar kursor",
+    code: `/* =========================================================================
+ * 1. int fseek(FILE *stream, long offset, int whence)
+ *    - Co robi: Przesuwa kursor odczytu/zapisu w strumieniu 'stream' o 'offset' bajtów.
+ *      UWAGA: Wyjście kursorem poza koniec pliku i zapisanie tam bajtu tworzy tzw.
+ *      plik rzadki (sparse file) – luka jest automatycznie wypełniana bajtami zerowymi ('\\0')!
+ *    - Argumenty:
+ *        stream -> wskaźnik FILE*
+ *        offset -> przesunięcie w bajtach (może być dodatnie, ujemne lub 0)
+ *        whence -> punkt odniesienia:
+ *          SEEK_SET : od początku pliku (offset >= 0)
+ *          SEEK_CUR : względem aktualnej pozycji kursora (offset +/-)
+ *          SEEK_END : względem końca pliku (np. offset = 0 ustawia na koniec, -1 na ostatni bajt)
+ *    - Zwraca: 0 w razie sukcesu.
+ *    - Błąd:   Zwraca -1 i ustawia errno.
+ *
+ * 2. long ftell(FILE *stream)
+ *    - Co robi: Zwraca aktualną pozycję kursora w bajtach licząc od początku pliku.
+ *    - Zwraca: Pozycja >= 0 w razie sukcesu; -1L w razie błędu (i ustawia errno).
+ *
+ * 3. void rewind(FILE *stream)
+ *    - Co robi: Przewija kursor na sam początek pliku (fseek(stream, 0, SEEK_SET)) i czyści flagi błędów.
+ * ========================================================================= */
+
+// Idiom: Sprawdzenie rozmiaru pliku za pomocą fseek + ftell:
+if (fseek(f, 0, SEEK_END) == -1) ERR("fseek");
+long file_size = ftell(f);
+if (file_size == -1L) ERR("ftell");
+rewind(f); // Powrót na początek przed czytaniem
+
+// WAŻNA ZASADA C: Jeśli na pliku otwartym w trybie "+" ("r+", "w+") przełączasz się
+// z czytania (fgets/fread) na pisanie (fprintf/fwrite) lub odwrotnie, MUSISZ pomiędzy nimi
+// wywołać fseek() (np. fseek(f, 0, SEEK_CUR)) lub rewind()!`
+  },
+  {
+    id: "fread-fwrite-fgets-fprintf",
+    cat: "6. Pliki (stdio)",
+    title: "Czytanie i pisanie (fread, fwrite, fgets, fprintf, unlink)",
+    tags: "fread fwrite fgets fprintf fgetc fputc feof ferror unlink",
+    code: `/* =========================================================================
+ * 1. size_t fread(void *restrict ptr, size_t size, size_t nitems, FILE *restrict stream)
+ *    size_t fwrite(const void *restrict ptr, size_t size, size_t nitems, FILE *restrict stream)
+ *    - Co robią: Wczytują / zapisują binarnie 'nitems' elementów, każdy o rozmiarze 'size' bajtów,
+ *      do/z bufora 'ptr'.
+ *    - Zwracają: Liczbę faktycznie wczytanych/zapisanych pełnych elementów (<= nitems).
+ *    - Błąd / EOF: Jeśli zwrócą mniej niż 'nitems', sprawdź przyczynę przez:
+ *        feof(stream)   -> zwraca != 0, gdy osiągnięto koniec pliku (EOF)
+ *        ferror(stream) -> zwraca != 0, gdy wystąpił błąd I/O
+ *
+ * 2. char *fgets(char *restrict s, int n, FILE *restrict stream)
+ *    - Co robi: Czyta jedną linię tekstu (maksymalnie n-1 znaków lub do znaku '\\n' włącznie)
+ *      i zawsze dokleja na końcu '\\0'. Znak '\\n' JEST zachowywany w buforze!
+ *    - Zwraca: Wskaźnik 's' w razie sukcesu.
+ *    - Koniec pliku / Błąd: Zwraca NULL, gdy natrafi na EOF przed wczytaniem znaku lub przy błędzie.
+ *
+ * 3. int fprintf(FILE *restrict stream, const char *restrict format, ...)
+ *    - Co robi: Zapisuje sformatowany tekst do strumienia (pliku, stdout lub stderr).
+ *    - Zwraca: Liczbę zapisanych bajtów lub wartość ujemną w razie błędu.
+ *
+ * 4. int unlink(const char *path)
+ *    - Co robi: Usuwa nazwę pliku z systemu plików (jeśli żaden proces go nie otwiera, kasuje plik).
+ *    - Zwraca: 0 w razie sukcesu; -1 w razie błędu i ustawia errno (np. ENOENT gdy plik nie istniał).
+ * ========================================================================= */
+
+// Czytanie pliku linia po linii i obcinanie znaku '\\n':
+char line[256];
+while (fgets(line, sizeof(line), f) != NULL) {
+    line[strcspn(line, "\\r\\n")] = '\\0'; // Bezpiecznie usuwa '\\n' z końca linii!
+    printf("Wczytano: %s\\n", line);
+}
+if (ferror(f)) ERR("fgets");
+
+// Bezpieczne usunięcie pliku (ignorujemy błąd, jeśli plik po prostu nie istniał):
+if (unlink("plik.txt") == -1 && errno != ENOENT) ERR("unlink");`
+  },
+
+  // =========================================================================
+  // 7. UPRAWNIENIA, KATALOGI I DOSTĘP (umask, chmod, mkdir, access)
+  // =========================================================================
+  {
+    id: "permissions-octal-macros",
+    cat: "7. Uprawnienia",
+    title: "Matematyka uprawnień (Oktalnie vs Makra S_I*)",
+    tags: "uprawnienia oktalne rwx chmod mode_t s_irusr s_iwusr s_ixusr",
+    code: `/* =========================================================================
+ * SYSTEM ÓSEMKOWY (OCTAL) - ZAWSZE Z ZEREM NA POCZĄTKU W KODZIE C (np. 0755, 0644)!
+ * Trzy grupy: [Właściciel (User)][Grupa (Group)][Inni (Others)]
+ * Wartości bitów w każdej grupie:
+ *   r (odczyt)    = 4
+ *   w (zapis)     = 2
+ *   x (wykonanie) = 1   (dla katalogu 'x' oznacza prawo WEJŚCIA do katalogu!)
+ *
+ * Sumowanie:
+ *   7 = 4+2+1 (rwx)
+ *   6 = 4+2   (rw-)
+ *   5 = 4+1   (r-x)
+ *   4 = 4     (r--)
+ *   0 =       (---)
+ *
+ * Przykłady:
+ *   0777 -> rwxrwxrwx (pełne prawa dla wszystkich)
+ *   0755 -> rwxr-xr-x (standard dla katalogów i programów)
+ *   0644 -> rw-r--r-- (standard dla zwykłych plików)
+ *   0444 -> r--r--r-- (tylko do odczytu dla wszystkich, np. pliki pakietów w sop-venv)
+ *
+ * Odpowiedniki w makrach POSIX (<sys/stat.h>), łączone operatorem bitowym '|':
+ *   User:   S_IRWXU (0700)  =  S_IRUSR (0400) | S_IWUSR (0200) | S_IXUSR (0100)
+ *   Group:  S_IRWXG (0070)  =  S_IRGRP (0040) | S_IWGRP (0020) | S_IXGRP (0010)
+ *   Others: S_IRWXO (0007)  =  S_IROTH (0004) | S_IWOTH (0002) | S_IXOTH (0001)
+ * ========================================================================= */
+
+// Odczytanie uprawnień z istniejącego pliku po lstat():
+struct stat st;
+lstat("plik.txt", &st);
+if (st.st_mode & S_IRUSR) {
+    // Właściciel ma prawo odczytu
+}`
+  },
+  {
+    id: "umask-chmod-mkdir-access",
+    cat: "7. Uprawnienia",
+    title: "Funkcje uprawnień i katalogów (umask, chmod, mkdir, access)",
+    tags: "umask chmod mkdir access f_ok r_ok w_ok x_ok eexist eacces",
+    code: `/* =========================================================================
+ * 1. mode_t umask(mode_t cmask)
+ *    - Co robi: Ustawia maskę bitów uprawnień, które system AUTOMATYCZNIE ODEJMUJE przy
+ *      tworzeniu nowych plików (fopen tworzy z 0666 & ~umask) i katalogów (mkdir tworzy z mode & ~umask).
+ *    - Argumenty: cmask -> bity do zablokowania. Jeśli chcesz nadać plikowi z fopen() prawa 'perms',
+ *      ustaw: umask(~perms & 0777). (Uwaga: fopen nigdy nie nada bitu 'x', bo startuje z 0666!).
+ *    - Zwraca: Poprzednią wartość maski. NIE ZWRACA BŁĘDÓW!
+ *
+ * 2. int chmod(const char *path, mode_t mode)
+ *    - Co robi: Bezpośrednio ustawia uprawnienia istniejącego pliku/katalogu na dokładnie 'mode'
+ *      (ignoruje umask!). Pozwala nadać również bity 'x' po utworzeniu pliku przez fopen().
+ *    - Zwraca: 0 w razie sukcesu; -1 w razie błędu (i ustawia errno, np. EPERM, ENOENT).
+ *
+ * 3. int mkdir(const char *path, mode_t mode)
+ *    - Co robi: Tworzy nowy, pusty katalog o ścieżce 'path' z uprawnieniami (mode & ~umask).
+ *    - Zwraca: 0 w razie sukcesu; -1 w razie błędu (errno = EEXIST gdy już istnieje!).
+ *
+ * 4. int access(const char *path, int amode)
+ *    - Co robi: Sprawdza, czy bieżący proces ma dostęp do pliku/katalogu 'path'.
+ *    - Argumenty: amode -> flagi łączone operatorem '|':
+ *        F_OK : czy plik/katalog w ogóle istnieje
+ *        R_OK : czy można czytać
+ *        W_OK : czy można pisać
+ *        X_OK : czy można wykonać / wejść do katalogu
+ *    - Zwraca: 0 gdy dostęp JEST przyznany; -1 gdy brak dostępu lub plik nie istnieje (errno: EACCES, ENOENT).
+ * ========================================================================= */
+
+// Tworzenie katalogu ze sprawdzeniem, czy już istniał:
+if (mkdir("index", 0755) == -1) {
+    if (errno == EEXIST) {
+        fprintf(stderr, "Katalog juz istnieje!\\n");
+        exit(EXIT_FAILURE);
+    }
+    ERR("mkdir");
+}
+
+// Ustawienie pliku na tylko do odczytu dla wszystkich (r--r--r--):
+if (chmod("pakiet", 0444) == -1) ERR("chmod");
+// lub równoważnie makrami: chmod("pakiet", S_IRUSR | S_IRGRP | S_IROTH);
+
+// Sprawdzenie, czy katalog istnieje i możemy go przeglądać:
+if (access(dir_path, F_OK | R_OK | X_OK) == -1) {
+    perror("Brak dostepu do katalogu");
+}`
+  },
+
+  // =========================================================================
+  // 8. DOWIĄZANIA SYMBOLICZNE I TWARDE (symlink, link, readlink)
+  // =========================================================================
+  {
+    id: "symlinks-api",
+    cat: "8. Symlinki",
+    title: "Tworzenie dowiązań (symlink, link, ścieżki względne)",
+    tags: "symlink link readlink dowiazania wzgledne eexist",
+    code: `/* =========================================================================
+ * 1. int symlink(const char *target, const char *linkpath)
+ *    - Co robi: Tworzy dowiązanie symboliczne o nazwie/ścieżce 'linkpath', które wewnątrz
+ *      siebie przechowuje tekst 'target' (czyli: linkpath -> wskazuje na -> target).
+ *    - Argumenty:
+ *        target   -> ścieżka docelowa, na którą wskazuje link.
+ *                    KLUCZOWA ZASADA: Jeśli 'target' jest ścieżką względną, system interpretuje ją
+ *                    Z PUNKTU WIDZENIA KATALOGU, W KTÓRYM LEŻY 'linkpath', a nie z CWD procesu!
+ *        linkpath -> ścieżka, pod którą ma powstać sam plik linku.
+ *    - Zwraca: 0 w razie sukcesu.
+ *    - Błąd:   Zwraca -1 i ustawia errno (np. EEXIST, gdy pod 'linkpath' już coś istnieje!).
+ *
+ * 2. int link(const char *oldpath, const char *newpath)
+ *    - Co robi: Tworzy dowiązanie twarde (hardlink) 'newpath' do istniejącego pliku 'oldpath'
+ *      (druga nazwa wskazująca na ten sam numer inode). Nie działa dla katalogów.
+ *    - Zwraca: 0 w razie sukcesu; -1 w razie błędu.
+ *
+ * 3. ssize_t readlink(const char *restrict path, char *restrict buf, size_t bufsize)
+ *    - Co robi: Odczytuje zawartość samego symlinka (ścieżkę docelową) do bufora 'buf'.
+ *      UWAGA: readlink NIE DODAJE znaku '\\0' na końcu bufora – musisz dodać go ręcznie!
+ *    - Zwraca: Liczbę wczytanych bajtów lub -1 w razie błędu.
+ * ========================================================================= */
+
+// PRZYKŁAD Z ZADANIA (library -> index/by-visible-title):
+// Plik książki leży w:         "library/sci-fi/diuna.txt"
+// Symlink chcemy stworzyć w:   "index/by-visible-title/diuna.txt"
+// Z perspektywy folderu "index/by-visible-title/", aby dostać się do katalogu głównego,
+// musimy wyjść 2 razy w górę ("../../"), a potem wejść do "library/sci-fi/diuna.txt"!
+
+char target[512];
+char linkpath[512];
+
+snprintf(target, sizeof(target), "../../%s", file_path_from_root); // np. "../../library/sci-fi/diuna.txt"
+snprintf(linkpath, sizeof(linkpath), "index/by-visible-title/%s", file_name);
+
+if (symlink(target, linkpath) == -1) {
+    if (errno == EEXIST) {
+        fprintf(stderr, "Blad: Powtorzona nazwa ksiazki: %s\\n", file_name);
+        exit(EXIT_FAILURE);
+    }
+    ERR("symlink");
+}`
+  },
+
+  // =========================================================================
+  // 9. WCZYTYWANIE ARGUMENTÓW I PARSOWANIE (getopt, strtol)
+  // =========================================================================
+  {
+    id: "getopt-strtol-full",
+    cat: "9. Argumenty i getopt",
+    title: "Parsowanie opcji i liczb (getopt, optarg, optind, strtol)",
+    tags: "getopt optarg optind strtol atoi oktalne dziesietne argumenty usage",
+    code: `/* =========================================================================
+ * 1. int getopt(int argc, char * const argv[], const char *optstring)
+ *    - Co robi: Parsuje flagi wiersza poleceń zaczynające się od '-'.
+ *    - Argumenty:
+ *        argc, argv -> parametry z main(int argc, char **argv)
+ *        optstring  -> string definiujący dozwolone flagi, np. "cv:i:p:d:":
+ *          - sama litera (np. 'c')       : flaga bez argumentu (przełącznik, np. -c)
+ *          - litera z dwukropkiem ('v:') : flaga WYMAGAJĄCA argumentu (np. -v env_name).
+ *                                          Wartość tego argumentu ląduje w globalnym 'char *optarg'.
+ *    - Zmienne globalne (<unistd.h>):
+ *        char *optarg -> wskaźnik na argument bieżącej opcji (dla flag z ':')
+ *        int optind   -> indeks w argv[] pierwszego argumentu POZA flagami (pozycyjnego).
+ *                        Jeśli po zakończeniu pętli (optind < argc), użytkownik podał
+ *                        dodatkowe parametry pozycyjne!
+ *    - Zwraca: Znak rozpoznanej opcji (np. 'c', 'v'), '?' w razie nieznanej opcji / braku
+ *              wymaganego argumentu, lub -1 gdy wszystkie opcje zostały przetworzone.
+ *
+ * 2. long strtol(const char *restrict nptr, char **restrict endptr, int base)
+ *    - Co robi: Konwertuje string 'nptr' na liczbę całkowitą typu long w systemie o podstawie 'base'.
+ *    - Argumenty:
+ *        nptr   -> tekst do konwersji (np. optarg)
+ *        endptr -> adres wskaźnika (np. &endptr lub NULL). Po wykonaniu wskazuje na pierwszy
+ *                  znak, którego nie udało się skonwertować (jeśli *endptr != '\\0', w napisie były śmieci!).
+ *        base   -> system liczbowy: 10 (dziesiętny, np. rozmiar/głębokość) lub 8 (oktalny, np. uprawnienia -p 0755).
+ *    - Zwraca: Skonwertowana wartość long. Przy przepełnieniu ustawia errno = ERANGE.
+ * ========================================================================= */
+
+int c;
+int c_flag = 0;
+char *out_file = NULL; // Pozwala wykryć nadmiarowe podanie flagi -o!
+char *paths[10];
+int path_count = 0;
+long size = -1;
+mode_t perms = (mode_t)-1;
+
+while ((c = getopt(argc, argv, "co:p:s:m:")) != -1) {
+    switch (c) {
+        case 'c':
+            c_flag = 1;
+            break;
+        case 'o':
+            if (out_file != NULL) usage(argv[0]); // Błąd: nadmiarowe -o!
+            out_file = optarg;
+            break;
+        case 'p':
+            if (path_count >= 10) usage(argv[0]);
+            paths[path_count++] = optarg;
+            break;
+        case 's': {
+            char *endptr;
+            errno = 0;
+            size = strtol(optarg, &endptr, 10); // Baza 10
+            if (errno != 0 || *endptr != '\\0' || size < 0) usage(argv[0]);
+            break;
+        }
+        case 'm':
+            perms = (mode_t)strtol(optarg, NULL, 8); // Baza 8 (oktalna dla uprawnień)
+            break;
+        case '?':
+        default:
+            usage(argv[0]);
+    }
+}
+
+// Sprawdzenie, czy podano niedozwolone dodatkowe parametry pozycyjne:
+if (optind < argc) {
+    usage(argv[0]);
+}`
+  },
+
+  // =========================================================================
+  // 10. BAZA GOTOWYCH FRAGMENTÓW KODU (BOILERPLATES DO ZADAŃ)
+  // =========================================================================
+  {
+    id: "code-join-paths",
+    cat: "10. Gotowe Klocki Kodu",
+    title: "Funkcja join_paths (dynamiczne łączenie ścieżek z malloc)",
+    tags: "join_paths sciezki malloc free lstat rekurencja",
+    code: `// Łączy dwie ścieżki z użyciem '/'. Zwraca nowy bufor z malloc (pamiętaj o free!).
+char *join_paths(const char *path1, const char *path2) {
+    char *res;
+    const int l1 = strlen(path1);
+    if (l1 > 0 && path1[l1 - 1] == '/') {
+        res = malloc(strlen(path1) + strlen(path2) + 1);
+        if (!res) ERR("malloc");
+        strcpy(res, path1);
+    } else {
+        res = malloc(strlen(path1) + strlen(path2) + 2);
+        if (!res) ERR("malloc");
+        strcpy(res, path1);
+        res[l1] = '/';
+        res[l1 + 1] = '\\0';
+    }
+    return strcat(res, path2);
+}`
+  },
+  {
+    id: "code-recursive-dir",
+    cat: "10. Gotowe Klocki Kodu",
+    title: "Rekurencyjne przeszukiwanie katalogu z głębokością (-d) i rozszerzeniem (-e)",
+    tags: "rekurencja search_dir glebokosc depth rozszerzenie opendir readdir lstat",
+    code: `void scan_dir_recursive(const char *dir_path, int cur_depth, int max_depth, const char *ext, FILE *out) {
+    if (max_depth != -1 && cur_depth > max_depth) return;
+
+    DIR *dirp = opendir(dir_path);
+    if (dirp == NULL) {
+        perror("opendir"); // Wypisuje błąd na stderr, ale pozwala kontynuować program
+        return;
+    }
+
+    fprintf(out, "PATH: %s\\n", dir_path);
+
+    struct dirent *dp;
+    struct stat st;
+    while (1) {
+        errno = 0;
+        if ((dp = readdir(dirp)) == NULL) {
+            if (errno != 0) ERR("readdir");
+            break;
+        }
+        if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)
+            continue;
+
+        char full_path[512];
+        snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, dp->d_name);
+
+        if (lstat(full_path, &st) == -1) {
+            perror("lstat");
+            continue;
+        }
+
+        if (S_ISDIR(st.st_mode)) {
+            if (max_depth == -1 || cur_depth < max_depth) {
+                scan_dir_recursive(full_path, cur_depth + 1, max_depth, ext, out);
+            }
+        } else if (S_ISREG(st.st_mode)) {
+            char *dot = strrchr(dp->d_name, '.');
+            // Jeśli ext == NULL (brak -e) -> wypisz wszystko; jeśli podano -e -> sprawdź po kropce
+            if (ext == NULL || (dot != NULL && dot != dp->d_name && (strcmp(dot, ext) == 0 || strcmp(dot + 1, ext) == 0))) {
+                fprintf(out, "%s - %ld\\n", dp->d_name, (long)st.st_size);
+            }
+        }
+    }
+
+    if (closedir(dirp) == -1) ERR("closedir");
+}`
+  },
+  {
+    id: "code-out-stream",
+    cat: "10. Gotowe Klocki Kodu",
+    title: "Zmienna strumienia wyjściowego (stdout lub plik z flagi -o)",
+    tags: "stdout plik -o fopen fprintf fclose strumien",
+    code: `// Domyślnie piszemy na ekran (stdout). Jeśli podano -o nazwa_pliku, otwieramy plik:
+FILE *out = stdout;
+if (out_filename != NULL) {
+    out = fopen(out_filename, "w");
+    if (out == NULL) ERR("fopen output");
+}
+
+// W całym programie używamy:
+fprintf(out, "Wynik: %s\\n", nazwa);
+
+// Na samym końcu main() zamykamy TYLKO jeśli to nie był stdout:
+if (out != stdout) {
+    if (fclose(out) == EOF) ERR("fclose output");
+}`
+  },
+  {
+    id: "code-remove-line",
+    cat: "10. Gotowe Klocki Kodu",
+    title: "Usuwanie wybranej linii z pliku tekstowego (np. odinstalowanie pakietu)",
+    tags: "usuwanie linii plik requirements fgets fopen remove_pck",
+    code: `void remove_line_from_file(const char *filepath, const char *target_pkg) {
+    FILE *f = fopen(filepath, "r");
+    if (f == NULL) ERR("fopen read");
+
+    char lines[128][256];
+    int count = 0;
+    int found = 0;
+    char buf[256];
+
+    while (fgets(buf, sizeof(buf), f) != NULL) {
+        char pkg[256];
+        if (sscanf(buf, "%255s", pkg) == 1 && strcmp(pkg, target_pkg) == 0) {
+            found = 1;
+            continue; // Pomijamy usuwaną linię
+        }
+        strcpy(lines[count++], buf);
+    }
+    if (fclose(f) == EOF) ERR("fclose");
+
+    if (!found) {
+        fprintf(stderr, "Blad: Pakiet %s nie jest zainstalowany!\\n", target_pkg);
+        exit(EXIT_FAILURE);
+    }
+
+    // Nadpisujemy plik od nowa ("w") pozostałymi liniami:
+    f = fopen(filepath, "w");
+    if (f == NULL) ERR("fopen write");
+    for (int i = 0; i < count; i++) {
+        fprintf(f, "%s", lines[i]);
+    }
+    if (fclose(f) == EOF) ERR("fclose");
+}`
+  },
+  {
+    id: "code-sparse-random",
+    cat: "10. Gotowe Klocki Kodu",
+    title: "Tworzenie pliku o zadanym rozmiarze z losowymi znakami (fseek + umask)",
+    tags: "make_file fseek rand srand umask sparse rozmiar",
+    code: `void make_random_file(const char *name, ssize_t size, mode_t perms, int percent) {
+    if (unlink(name) == -1 && errno != ENOENT) ERR("unlink");
+
+    umask(~perms & 0777);
+    FILE *f = fopen(name, "w+");
+    if (f == NULL) ERR("fopen");
+
+    // Gwarantujemy dokładny rozmiar pliku zapisując bajt '\\0' na ostatniej pozycji (size - 1):
+    if (size > 0) {
+        if (fseek(f, size - 1, SEEK_SET) == -1) ERR("fseek");
+        fputc('\\0', f);
+    }
+
+    // Wypełniamy procent pliku losowymi literami A-Z w losowych miejscach:
+    for (ssize_t i = 0; i < (size * percent) / 100; i++) {
+        if (fseek(f, rand() % size, SEEK_SET) == -1) ERR("fseek");
+        fprintf(f, "%c", 'A' + (rand() % ('Z' - 'A' + 1)));
+    }
+
+    if (fclose(f) == EOF) ERR("fclose");
+}`
+  }
+];
+
+    // =========================================================================
+    // === SILNIK STRONY (NIE MUSISZ GO NIGDY EDYTOWAĆ) ===
+    // =========================================================================
+    let currentCategory = 'ALL';
+
+    function init() {
+      const container = document.getElementById('snippets-container');
+      const jumpList = document.getElementById('jump-list');
+      const catList = document.getElementById('cat-list');
+      const categories = ['ALL', ...new Set(SNIPPETS.map(s => s.cat))];
+
+      // Renderowanie kategorii
+      categories.forEach(cat => {
+        const btn = document.createElement('button');
+        btn.className = 'nav-btn' + (cat === 'ALL' ? ' active' : '');
+        btn.textContent = cat === 'ALL' ? 'Wszystkie klocki' : cat;
+        btn.onclick = () => {
+          currentCategory = cat;
+          document.querySelectorAll('#cat-list .nav-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          applyFilters();
+        };
+        catList.appendChild(btn);
+      });
+
+      // Renderowanie kart i szybkich skoków
+      SNIPPETS.forEach((s, idx) => {
+        const numTitle = `${idx + 1}. ${s.title}`;
+
+        // Karta
+        const card = document.createElement('div');
+        card.className = 'snippet';
+        card.id = `snip-${s.id}`;
+        card.dataset.cat = s.cat;
+        card.dataset.search = `${s.title} ${s.tags} ${s.cat} ${s.code}`.toLowerCase();
+
+        const header = document.createElement('div');
+        header.className = 'snippet-header';
+        header.innerHTML = `<div><span class="snippet-title">${numTitle}</span><span class="snippet-cat">[${s.cat}]</span></div>`;
+
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'copy-btn';
+        copyBtn.textContent = 'Kopiuj';
+        copyBtn.onclick = () => {
+          navigator.clipboard.writeText(s.code).then(() => {
+            copyBtn.textContent = 'Skopiowano!';
+            setTimeout(() => copyBtn.textContent = 'Kopiuj', 1000);
+          });
+        };
+        header.appendChild(copyBtn);
+
+        const pre = document.createElement('pre');
+        const codeEl = document.createElement('code');
+        codeEl.textContent = s.code; // Bezpiecznie escapuje < > &
+        pre.appendChild(codeEl);
+
+        card.appendChild(header);
+        card.appendChild(pre);
+        container.appendChild(card);
+
+        // Link w menu bocznym
+        const link = document.createElement('a');
+        link.href = `#snip-${s.id}`;
+        link.className = 'nav-btn';
+        link.dataset.cat = s.cat;
+        link.textContent = numTitle;
+        jumpList.appendChild(link);
+      });
+    }
+
+    function applyFilters() {
+      const q = document.getElementById('search').value.toLowerCase();
+      document.querySelectorAll('.snippet').forEach(el => {
+        const matchCat = (currentCategory === 'ALL' || el.dataset.cat === currentCategory);
+        const matchSearch = el.dataset.search.includes(q);
+        el.classList.toggle('hidden', !(matchCat && matchSearch));
+      });
+    }
+
+    document.getElementById('search').addEventListener('input', applyFilters);
+    init();
+  </script>
+</body>
+</html>
