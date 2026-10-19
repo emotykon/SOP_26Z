@@ -922,6 +922,279 @@ if (out != stdout) {
     if (fclose(f) == EOF) ERR("fclose");
 }`
   }
+      ,
+  // =========================================================================
+  // NOWE KLOCKI WYCIĄGNIĘTE Z KODÓW + DODATKOWE PROPOZYCJE
+  // =========================================================================
+  {
+    id: "env-vars-getenv-setenv",
+    cat: "9. Argumenty i getopt",
+    title: "Zmienne środowiskowe (getenv, setenv, unsetenv)",
+    tags: "getenv setenv unsetenv srodowisko l1_outputfile plik wyjsciowy",
+    code: `/* =========================================================================
+ * 1. char *getenv(const char *name)
+ *    - Co robi: Pobiera wartość zmiennej środowiskowej o nazwie 'name' (np. "L1_OUTPUTFILE", "HOME").
+ *    - Argumenty: name -> nazwa zmiennej (BEZ znaku '$'!).
+ *    - Zwraca: Wskaźnik na wartość zmiennej (NIE WOLNO go modyfikować ani robić na nim free()!).
+ *    - Błąd / Brak zmiennej: Zwraca NULL, jeśli zmienna nie istnieje w środowisku.
+ *
+ * 2. int setenv(const char *name, const char *value, int overwrite)
+ *    - Co robi: Ustawia lub tworzy zmienną środowiskową 'name' na wartość 'value'.
+ *    - Argumenty: overwrite -> jeśli != 0, nadpisuje istniejącą wartość; jeśli == 0, nie zmienia istniejącej.
+ *    - Zwraca: 0 w razie sukcesu; -1 w razie błędu (ustawia errno).
+ *
+ * 3. int unsetenv(const char *name)
+ *    - Co robi: Usuwa zmienną 'name' ze środowiska procesu. Zwraca 0 lub -1.
+ * ========================================================================= */
+
+// Wzorzec z zadania: Jeśli podano flagę -o (bez argumentu), pobierz nazwę pliku ze zmiennej L1_OUTPUTFILE:
+FILE *out = stdout;
+if (use_output_flag) {
+    const char *outfile = getenv("L1_OUTPUTFILE");
+    if (outfile == NULL) {
+        fprintf(stderr, "Blad: Zmienna L1_OUTPUTFILE nie jest ustawiona!\\n");
+        exit(EXIT_FAILURE);
+    }
+    out = fopen(outfile, "w");
+    if (out == NULL) ERR("fopen L1_OUTPUTFILE");
+}
+
+// ... wypisywanie przez fprintf(out, ...) ...
+
+if (out != stdout) {
+    if (fclose(out) == EOF) ERR("fclose");
+}`
+  },
+  {
+    id: "code-has-extension",
+    cat: "10. Gotowe Klocki Kodu",
+    title: "Czysta funkcja sprawdzająca rozszerzenie pliku (has_extension)",
+    tags: "has_extension rozszerzenie strrchr kropka filtr",
+    code: `// Zwraca 1 (true), jeśli plik pasuje do rozszerzenia (lub gdy brak filtra ext == NULL).
+// Obsługuje podanie rozszerzenia zarówno z kropką (".txt"), jak i bez ("txt").
+int has_extension(const char *filename, const char *ext) {
+    if (ext == NULL) return 1; // Brak filtra (-e nie podano) -> akceptuj każdy plik
+
+    const char *dot = strrchr(filename, '.');
+    if (dot == NULL || dot == filename) return 0; // Brak kropki lub plik ukryty (np. ".bashrc")
+
+    if (ext[0] == '.') {
+        return strcmp(dot, ext) == 0;     // Porównanie z kropką (np. ".txt" == ".txt")
+    } else {
+        return strcmp(dot + 1, ext) == 0; // Porównanie bez kropki (np. "txt" == "txt")
+    }
+}`
+  },
+  {
+    id: "code-options-struct",
+    cat: "10. Gotowe Klocki Kodu",
+    title: "Struktura Options + dynamiczna tablica katalogów (malloc argc)",
+    tags: "options struct parse_args getopt dynamiczna tablica dirs malloc",
+    code: `typedef struct {
+    char **dirs;      // Dynamiczna tablica wskaźników (zawsze wystarczy rozmiar argc!)
+    int dir_count;
+    char *extension;  // NULL oznacza brak filtra
+    int max_depth;    // np. INT_MAX z <limits.h> domyślnie
+    char *outfile;    // NULL oznacza stdout
+} Options;
+
+void parse_args(int argc, char **argv, Options *opts) {
+    opts->dirs = malloc(argc * sizeof(char *));
+    if (opts->dirs == NULL) ERR("malloc");
+    opts->dir_count = 0;
+    opts->extension = NULL;
+    opts->max_depth = INT_MAX; // Wymaga #include <limits.h>
+    opts->outfile = NULL;
+
+    int c;
+    while ((c = getopt(argc, argv, "p:e:d:o:")) != -1) {
+        switch (c) {
+            case 'p':
+                opts->dirs[opts->dir_count++] = optarg;
+                break;
+            case 'e':
+                if (opts->extension != NULL) usage(argv[0]);
+                opts->extension = optarg;
+                break;
+            case 'd': {
+                char *endptr;
+                errno = 0;
+                long val = strtol(optarg, &endptr, 10);
+                if (errno != 0 || *endptr != '\\0' || val < 1) usage(argv[0]);
+                opts->max_depth = (int)val;
+                break;
+            }
+            case 'o':
+                if (opts->outfile != NULL) usage(argv[0]); // Max jedno -o
+                opts->outfile = optarg;
+                break;
+            case '?':
+            default:
+                free(opts->dirs);
+                usage(argv[0]);
+        }
+    }
+
+    if (optind < argc) { // Niedozwolone argumenty pozycyjne
+        free(opts->dirs);
+        usage(argv[0]);
+    }
+
+    // Jeśli nie podano żadnego -p, domyślnie skanuj katalog bieżący "."
+    if (opts->dir_count == 0) {
+        opts->dirs[opts->dir_count++] = ".";
+    }
+}
+// PAMIĘTAJ: Na końcu main() wywołaj: free(opts.dirs);`
+  },
+  {
+    id: "code-abs-path-chdir-trick",
+    cat: "10. Gotowe Klocki Kodu",
+    title: "Wypisanie bezwzględnej ścieżki katalogu (trik z chdir + getcwd)",
+    tags: "chdir getcwd sciezka bezwzgledna homedir fun scan",
+    code: `// Wzorzec z Twojego kodu (naprawiony o powrót do homedir!):
+// Pozwala łatwo uzyskać i wypisać pełną ścieżkę bezwzględną dla dowolnego folderu względnego
+void scan_single_dir(const char *target_dir, FILE *out) {
+    char homedir[PATH_MAX];
+    char abs_path[PATH_MAX];
+
+    if (getcwd(homedir, sizeof(homedir)) == NULL) ERR("getcwd homedir");
+
+    if (chdir(target_dir) == -1) {
+        perror("chdir target");
+        return; // Kontynuujemy dla pozostałych katalogów
+    }
+
+    if (getcwd(abs_path, sizeof(abs_path)) == NULL) ERR("getcwd abs_path");
+
+    DIR *dirp = opendir(".");
+    if (dirp == NULL) {
+        perror("opendir");
+        if (chdir(homedir) == -1) ERR("chdir back");
+        return;
+    }
+
+    fprintf(out, "SCIEZKA:\\n%s\\nLISTA PLIKOW:\\n", abs_path);
+
+    struct dirent *dp;
+    struct stat st;
+    while (1) {
+        errno = 0;
+        if ((dp = readdir(dirp)) == NULL) {
+            if (errno != 0) ERR("readdir");
+            break;
+        }
+        if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)
+            continue;
+
+        if (lstat(dp->d_name, &st) == 0) {
+            fprintf(out, "%s : %ld\\n", dp->d_name, (long)st.st_size);
+        } else {
+            fprintf(out, "%s : ?\\n", dp->d_name);
+        }
+    }
+
+    if (closedir(dirp) == -1) ERR("closedir");
+    if (chdir(homedir) == -1) ERR("chdir back"); // KLUCZOWE: powrót do katalogu startowego!
+}`
+  },
+  {
+    id: "nftw-tree-walk",
+    cat: "4. Katalogi i stat",
+    title: "Automatyczna rekurencja po drzewie katalogów (nftw - <ftw.h>)",
+    tags: "nftw ftw rekurencja drzewo katalogow ftw_phys ftw_f ftw_d level",
+    code: `/* =========================================================================
+ * int nftw(const char *dirpath, int (*fn)(const char *fpath, const struct stat *sb,
+ *          int typeflag, struct FTW *ftwbuf), int nopenfd, int flags)
+ *    - Co robi: Automatycznie przechodzi całe drzewo katalogów zaczynając od 'dirpath'
+ *      i dla każdego znalezionego obiektu wywołuje funkcję zwrotną 'fn'.
+ *      Wymaga: #define _XOPEN_SOURCE 500 (lub 700) oraz #include <ftw.h>.
+ *    - Argumenty:
+ *        dirpath -> ścieżka początkowa
+ *        fn      -> wskaźnik na Twoją funkcję callback
+ *        nopenfd -> max liczba jednocześnie otwartych deskryptorów (np. 20)
+ *        flags   -> flagi sterujące (łączone '|'):
+ *          FTW_PHYS  : NIE podążaj za symlinkami (odpowiednik lstat - ZAWSZE UŻYWAJ!)
+ *          FTW_DEPTH : najpierw odwiedź zawartość podkatalogu, a sam katalog na końcu
+ *                      (przydatne przy rekurencyjnym usuwaniu katalogów!)
+ *          FTW_MOUNT : nie wychodź poza ten sam system plików
+ *    - Argumenty funkcji callback 'fn':
+ *        fpath    -> pełna ścieżka do aktualnego pliku/katalogu (od dirpath)
+ *        sb       -> wskaźnik na gotową strukturę 'struct stat' dla tego obiektu
+ *        typeflag -> typ obiektu:
+ *          FTW_F   : zwykły plik
+ *          FTW_D   : katalog
+ *          FTW_DNR : katalog, którego nie da się odczytać
+ *          FTW_SL  : link symboliczny (gdy użyto FTW_PHYS)
+ *        ftwbuf   -> struktura zawierająca:
+ *          ftwbuf->level : głębokość zagnieżdżenia (0 dla samego dirpath, 1 dla jego elementów itd.)
+ *          ftwbuf->base  : indeks w 'fpath', od którego zaczyna się sama nazwa pliku
+ *                          (czyli nazwa pliku to: fpath + ftwbuf->base)
+ *    - Zwraca (callback fn): Zwrócenie 0 kontynuuje przeglądanie; zwrócenie != 0 natychmiast przerywa nftw!
+ *    - Zwraca (nftw): 0 w razie sukcesu, -1 w razie błędu systemowego.
+ * ========================================================================= */
+
+#define MAXFD 20
+static int max_depth_global = 3; // nftw nie przyjmuje void* arg, więc filtry przekazujemy przez zmienne globalne
+
+int walk_callback(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf) {
+    // ftwbuf->level == 0 to sam katalog główny, level == 1 to pliki bezpośrednio w nim
+    if (ftwbuf->level > max_depth_global) {
+        return 0; // Ignorujemy głębsze poziomy, ale zwracamy 0, by kontynuować resztę drzewa
+    }
+
+    const char *filename = fpath + ftwbuf->base; // Sama nazwa pliku bez ścieżki!
+
+    switch (typeflag) {
+        case FTW_D:
+            printf("[DIR  lvl=%d] %s\\n", ftwbuf->level, fpath);
+            break;
+        case FTW_F:
+            printf("[FILE lvl=%d] %s (rozmiar: %ld B)\\n", ftwbuf->level, filename, (long)sb->st_size);
+            break;
+        case FTW_SL:
+            printf("[LINK lvl=%d] %s\\n", ftwbuf->level, filename);
+            break;
+    }
+    return 0; // 0 = idź dalej
+}
+
+// Wywołanie w main():
+// if (nftw(sciezka, walk_callback, MAXFD, FTW_PHYS) == -1) ERR("nftw");`
+  },
+  {
+    id: "getline-dynamic-read",
+    cat: "6. Pliki (stdio)",
+    title: "Czytanie linii dowolnej długości (getline - POSIX)",
+    tags: "getline getdelim czytanie pliku linia po linii dynamiczny bufor",
+    code: `/* =========================================================================
+ * ssize_t getline(char **restrict lineptr, size_t *restrict n, FILE *restrict stream)
+ *    - Co robi: Wczytuje całą linię ze strumienia 'stream' (np. pliku lub stdin),
+ *      AUTOMATYCZNIE alokując lub powiększając bufor '*lineptr' przez realloc(),
+ *      jeśli linia jest długa. Nigdy nie ucina linii!
+ *    - Argumenty:
+ *        lineptr -> adres wskaźnika na bufor (przed pętlą zainicjuj: char *line = NULL;)
+ *        n       -> adres zmiennej z rozmiarem bufora (przed pętlą: size_t len = 0;)
+ *        stream  -> strumień FILE* (np. otwarty plik lub stdin)
+ *    - Zwraca: Liczbę wczytanych znaków (wraz ze znakiem '\\n', ale bez '\\0').
+ *    - Koniec pliku / Błąd: Zwraca -1 przy EOF lub błędzie (sprawdź errno lub feof()).
+ *    - WAŻNE: Po zakończeniu pętli MUSISZ zrobić jedno free(line)!
+ * ========================================================================= */
+
+char *line = NULL;
+size_t len = 0;
+ssize_t nread;
+
+while ((nread = getline(&line, &len, file)) != -1) {
+    // Jeśli chcesz usunąć znak nowej linii z końca:
+    if (nread > 0 && line[nread - 1] == '\\n') {
+        line[nread - 1] = '\\0';
+    }
+    printf("Linia (%zd znakow): %s\\n", nread, line);
+}
+
+free(line); // Obowiązkowe zwolnienie bufora po pętli!`
+  }
 ];
 
     // =========================================================================
