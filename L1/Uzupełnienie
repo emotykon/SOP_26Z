@@ -1,0 +1,46 @@
+  ,
+  {
+    id: "parse-key-value-sscanf",
+    cat: "11. Pisanie i Czytanie (*printf / *scanf)",
+    title: "Proste parsowanie linii 'klucz : wartość' (fgets + sscanf)",
+    tags: "klucz wartosc sscanf fgets strtok config plik konfiguracyjny",
+    code: `/* =========================================================================
+ * PROSTY WZOREC PARSOWANIA LINII "klucz : wartość":
+ * 
+ * Format w sscanf: "%127[^:]:[ \\t]*%127[^\\r\\n]"
+ *   - %127[^:]    : wczytaj klucz (wszystko do dwukropka, max 127 znaków)
+ *   - :           : pochłonoć znak dwukropka
+ *   - [ \\t]*     : zignoruj opcjonalne spacje lub tabulatory po dwukropku
+ *   - %127[^\\r\\n] : wczytaj wartość aż do końca linii (ze spacjami)
+ * ========================================================================= */
+
+char line[256];
+char klucz[128];
+char wartosc[128];
+
+while (fgets(line, sizeof(line), file) != NULL) {
+    // Pomijamy puste linie i komentarze
+    if (line[0] == '\\n' || line[0] == '\\r' || line[0] == '#' || line[0] == '\\0')
+        continue;
+
+    // Bezpieczne sscanf z limitem do 127 znaków
+    if (sscanf(line, "%127[^:]:[ \\t]*%127[^\\r\\n]", klucz, wartosc) == 2) {
+        
+        // Obcięcie ewentualnych spacji z końca klucza
+        int len = strlen(klucz);
+        while (len > 0 && (klucz[len - 1] == ' ' || klucz[len - 1] == '\\t')) {
+            klucz[--len] = '\\0';
+        }
+
+        printf("Klucz: [%s] ---> Wartość: [%s]\\n", klucz, wartosc);
+
+        // Dopasowanie klucza
+        if (strcmp(klucz, "HOST") == 0) {
+            // obsłuż hosta
+        } else if (strcmp(klucz, "PORT") == 0) {
+            int port = atoi(wartosc);
+            // obsłuż port
+        }
+    }
+}`
+  }
