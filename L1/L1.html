@@ -1195,6 +1195,112 @@ while ((nread = getline(&line, &len, file)) != -1) {
 
 free(line); // Obowiązkowe zwolnienie bufora po pętli!`
   }
+      ,
+  // =========================================================================
+  // 11. PISANIE I CZYTANIE FORMATOWANE (*printf, *scanf, fgets vs fread)
+  // =========================================================================
+  {
+    id: "printf-family-guide",
+    cat: "11. Pisanie i Czytanie (*printf / *scanf)",
+    title: "Rodzina *printf (printf, fprintf, snprintf, dprintf) – co i kiedy używać",
+    tags: "printf fprintf snprintf sprintf dprintf stdout stderr formatowanie bufor",
+    code: `/* =========================================================================
+ * ZESTAWIENIE FUNKCJI *printf (<stdio.h>):
+ *
+ * 1. int printf(const char *format, ...)
+ *    - Gdzie pisze: Na standardowe wyjście (stdout – ekran).
+ *    - Kiedy używać: Zwykłe komunikaty wynikowe, gdy zadanie nie wymaga flagi -o.
+ *    - Buforowanie: Liniowe (do terminala – wypisze dopiero po '\\n') lub pełne (gdy przekierowano do pliku).
+ *
+ * 2. int fprintf(FILE *stream, const char *format, ...)
+ *    - Gdzie pisze: Do wskazanego strumienia FILE* (otwarty plik z fopen, stdout lub stderr).
+ *    - Kiedy używać (NAJWAŻNIEJSZA FUNKCJA NA SOP):
+ *        a) Błędy i usage: fprintf(stderr, "Blad...\\n") -> stderr NIE JEST buforowany (wypisuje natychmiast!).
+ *        b) Uniwersalne wyjście: gdy masz zmienną FILE *out = stdout; (pisze na ekran lub do pliku z -o).
+ *        c) Zapis tekstowy do pliku otwartego przez fopen().
+ *    - Zwraca: Liczbę zapisanych znaków lub wartość < 0 w razie błędu.
+ *
+ * 3. int snprintf(char *str, size_t size, const char *format, ...)
+ *    - Gdzie pisze: Do tablicy znaków w pamięci (char buf[]) z twardym limitem 'size' bajtów.
+ *    - Kiedy używać: ZAWSZE gdy sklejasz ścieżki ("%s/%s") lub budujesz napis w pamięci!
+ *      Zastępuje niebezpieczne strcpy/strcat oraz sprintf (które nie sprawdza rozmiaru i robi overflow).
+ *    - Zwraca: Liczbę znaków, które zostałyby zapisane (bez '\\0'). Jeśli wynik >= size -> ucięto napis!
+ *
+ * 4. int dprintf(int fd, const char *format, ...)
+ *    - Gdzie pisze: Bezpośrednio do niskopoziomowego deskryptora pliku (int fd z open() lub pipe()).
+ *    - Kiedy używać: Na labach z niskopoziomowego I/O, gdy nie używasz FILE*.
+ * ========================================================================= */
+
+// 1. Diagnostyka / błędy (zawsze na stderr!):
+fprintf(stderr, "USAGE: %s -p <path>\\n", argv[0]);
+
+// 2. Zapis do zmiennej strumieniowej (stdout lub plik z fopen):
+FILE *out = stdout;
+fprintf(out, "Plik: %s, Rozmiar: %ld B\\n", dp->d_name, (long)st.st_size);
+
+// 3. Bezpieczne sklejanie ścieżki w buforze pamięci:
+char full_path[512];
+int n = snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, dp->d_name);
+if (n < 0 || (size_t)n >= sizeof(full_path)) ERR("snprintf overflow");`
+  },
+  {
+    id: "scanf-fgets-fread-guide",
+    cat: "11. Pisanie i Czytanie (*printf / *scanf)",
+    title: "Wczytywanie i parsowanie (fgets + sscanf vs fscanf vs fread/fwrite)",
+    tags: "scanf fscanf sscanf fgets fread fwrite parsowanie plik tekstowy binarny",
+    code: `/* =========================================================================
+ * ZESTAWIENIE FUNKCJI WCZYTUJĄCYCH (<stdio.h>):
+ *
+ * 1. ZŁOTY WZORZEC NA PLIKI TEKSTOWE: fgets() + sscanf()
+ *    - Dlaczego NIE samo fscanf(file, ...)?
+ *      fscanf czyta do białego znaku, ignoruje podział na linie, zostawia '\\n' w buforze
+ *      i całkowicie się rozjeżdża, gdy jedna linia w pliku ma zły format.
+ *    - Jak działa duet fgets + sscanf:
+ *        Krok 1: char *fgets(char *buf, int size, FILE *stream)
+ *                Wczytuje DOKŁADNIE JEDNĄ linię z pliku do bufora 'buf' (zwraca NULL na EOF).
+ *        Krok 2: int sscanf(const char *buf, const char *format, ...)
+ *                Wyciąga zmienne z bufora 'buf' w pamięci.
+ *                Zwraca liczbę poprawnie dopasowanych i wczytanych zmiennych!
+ *
+ * 2. int scanf(const char *format, ...) / int fscanf(FILE *stream, const char *format, ...)
+ *    - Skąd czyta: scanf z klawiatury (stdin), fscanf z pliku (stream).
+ *    - Kiedy używać: Tylko przy bardzo prostym wczytywaniu pojedynczych słów/liczb.
+ *      Zawsze podawaj limit szerokości dla stringów, np. scanf("%127s", buf), by uniknąć overflow!
+ *
+ * 3. KIEDY TEKSTOWE (fgets/fprintf), A KIEDY BINARNE (fread/fwrite)?
+ *    - Tekstowe (fgets, fprintf, sscanf): Gdy plik zawiera czytelne dla człowieka linie tekstu
+ *      (np. plik "requirements", konfiguracje, logi).
+ *    - Binarne (fread, fwrite): Gdy czytasz/zapisujesz surowe bajty, struktury C (struct),
+ *      lub kopiujesz plik blokami (gdzie w środku mogą być bajty zerowe '\\0', na których
+ *      funkcje tekstowe by się zatrzymały!).
+ * ========================================================================= */
+
+// WZORZEC 1: Bezpieczne parsowanie pliku linia po linii (fgets + sscanf)
+char line[256];
+char pkg[128], ver[128];
+
+while (fgets(line, sizeof(line), file) != NULL) {
+    // Pomijamy puste linie
+    if (line[0] == '\\n' || line[0] == '\\0') continue;
+
+    // sscanf zwraca 2, jeśli w linii faktycznie były dwa słowa oddzielone spacją:
+    if (sscanf(line, "%127s %127s", pkg, ver) == 2) {
+        printf("Wczytano pakiet: %s, wersja: %s\\n", pkg, ver);
+    } else {
+        fprintf(stderr, "Blad formatu w linii: %s", line);
+    }
+}
+
+// WZORZEC 2: Binarne kopiowanie / czytanie pliku porcjami (fread + fwrite)
+char buf[1024];
+size_t bytes_read;
+while ((bytes_read = fread(buf, 1, sizeof(buf), src_file)) > 0) {
+    if (fwrite(buf, 1, bytes_read, dst_file) != bytes_read) {
+        ERR("fwrite");
+    }
+}
+if (ferror(src_file)) ERR("fread");`
+  }
 ];
 
     // =========================================================================
