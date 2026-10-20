@@ -1,0 +1,242 @@
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/uio.h>
+#include <dirent.h>
+#include <errno.h>
+#include <stdint.h>
+
+#define ERR(source) (perror(source), fprintf(stderr, "%s:%d\n", __FILE__, __LINE__), exit(EXIT_FAILURE))
+
+typedef struct {
+    char author[256];
+    char title[256];
+    char genre[256];
+} Metadata;
+
+// Struktura wpisu w bazie binarnej (68 bajtów)
+typedef struct {
+    uint32_t size;
+    char title[65]; // 64 bajty + znak końca stringa '\0'
+} __attribute__((packed)) DbEntry;
+
+// Funkcja parsująca plik metadanych (Etap 1)
+Metadata parse_metadata(const char *filepath) {
+    Metadata m = {0};
+    strcpy(m.author, "missing!");
+    strcpy(m.title, "missing!");
+    strcpy(m.genre, "missing!");
+
+    FILE *f = fopen(filepath, "r");
+    if (!f) return m;
+
+    char *line = NULL;
+    size_t len = 0;
+    while (getline(&line, &len, f) != -1) {
+        line[strcspn(line, "\r\n")] = '\0';
+        char *colon = strchr(line, ':');
+        if (colon) {
+            *colon = '\0';
+            char *key = line;
+            char *val = colon + 1;
+            while (*val == ' ') val++;
+
+            if (strcmp(key, "author") == 0) {
+                strncpy(m.author, val, sizeof(m.author) - 1);
+            } else if (strcmp(key, "title") == 0) {
+                strncpy(m.title, val, sizeof(m.title) - 1);
+            } else if (strcmp(key, "genre") == 0) {
+                strncpy(m.genre, val, sizeof(m.genre) - 1);
+            }
+        }
+    }
+    free(line);
+    fclose(f);
+    return m;
+}
+
+// Funkcja pomocnicza do tworzenia bezpiecznych katalogów
+void safe_mkdir(const char *path) {
+    if (mkdir(path, 0755) == -1 && errno != EEXIST) {
+        ERR("mkdir");
+    }
+}
+
+// Funkcja rekurencyjna do przeszukiwania biblioteki i tworzenia indeksów
+void process_library(const char *current_dir) {
+    DIR *dir = opendir(current_dir);
+    if (!dir) ERR("opendir");
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
+
+        char path[1024];
+        snprintf(path, sizeof(path), "%s/%s", current_dir, entry->d_name);
+
+        struct stat st;
+        if (lstat(path, &st) == -1) ERR("lstat");
+
+        if (S_ISDIR(st.st_mode)) {
+            process_library(path);
+        } else if (S_ISREG(st.st_mode)) {
+            // Każdy zwykły plik to książka z metadanymi wewnątrz
+            Metadata meta = parse_metadata(path);
+
+            // 1. by-visible-title (względny symlink)
+            // Relatywna ścieżka z index/by-visible-title/ do pliku: ../../<path>
+            char target_vis[1200];
+            snprintf(target_vis, sizeof(target_vis), "../../%s", path);
+            char link_vis[1200];
+            snprintf(link_vis, sizeof(link_vis), "index/by-visible-title/%s", entry->d_name);
+
+            if (symlink(target_vis, link_vis) == -1) {
+                if (errno == EEXIST) {
+                    fprintf(stderr, "Error: Duplicate name in by-visible-title: %s\n", entry->d_name);
+                    exit(EXIT_FAILURE);
+                } else {
+                    ERR("symlink by-visible-title");
+                }
+            }
+
+            // 2. by-title (jeśli pole title istnieje)
+            if (strcmp(meta.title, "missing!") != 0) {
+                char clean_title[65];
+                strncpy(clean_title, meta.title, 64);
+                clean_title[64] = '\0';
+
+                char target_title[1200];
+                snprintf(target_title, sizeof(target_title), "../../%s", path);
+                char link_title[1200];
+                snprintf(link_title, sizeof(link_title), "index/by-title/%s", clean_title);
+
+                if (symlink(target_title, link_title) == -1) {
+                    if (errno == EEXIST) {
+                        fprintf(stderr, "Error: Duplicate title in by-title: %s\n", clean_title);
+                        exit(EXIT_FAILURE);
+                    } else {
+                        ERR("symlink by-title");
+                    }
+                }
+
+                // 3. by-genre/<genre>
+                if (strcmp(meta.genre, "missing!") != 0) {
+                    char clean_genre[65];
+                    strncpy(clean_genre, meta.genre, 64);
+                    clean_genre[64] = '\0';
+
+                    char genre_dir[1300];
+                    snprintf(genre_dir, sizeof(genre_dir), "index/by-genre/%s", clean_genre);
+                    safe_mkdir("index/by-genre");
+                    safe_mkdir(genre_dir);
+
+                    // Ścieżka z index/by-genre/<genre>/ do pliku: ../../../<path>
+                    char target_genre[1200];
+                    snprintf(target_genre, sizeof(target_genre), "../../../%s", path);
+                    char link_genre[1300];
+                    snprintf(link_genre, sizeof(link_genre), "%s/%s", genre_dir, clean_title);
+
+                    if (symlink(target_genre, link_genre) == -1) {
+                        if (errno == EEXIST) {
+                            fprintf(stderr, "Error: Duplicate title in genre %s: %s\n", clean_genre, clean_title);
+                            exit(EXIT_FAILURE);
+                        } else {
+                            ERR("symlink by-genre");
+                        }
+                    }
+                }
+            }
+        }
+    }
+    closedir(dir);
+}
+
+// Funkcja weryfikująca bazę danych przy użyciu readv (Etap 4)
+void verify_database(const char *db_filepath) {
+    FILE *db = fopen(db_filepath, "rb");
+    if (!db) ERR("fopen db");
+
+    int fd = fileno(db);
+    struct stat st;
+    if (fstat(fd, &st) == -1) ERR("fstat db");
+
+    size_t file_size = st.st_size;
+    size_t entry_count = file_size / sizeof(DbEntry);
+    if (entry_count == 0) {
+        fclose(db);
+        return;
+    }
+
+    DbEntry *entries = malloc(entry_count * sizeof(DbEntry));
+    if (!entries) ERR("malloc entries");
+
+    // Przygotowanie tablicy struktur iovec dla readv
+    struct iovec *iov = malloc(entry_count * sizeof(struct iovec));
+    if (!iov) ERR("malloc iov");
+
+    for (size_t i = 0; i < entry_count; i++) {
+        iov[i].iov_base = &entries[i];
+        iov[i].iov_len = sizeof(DbEntry);
+    }
+
+    // Wczytanie bazy za pomocą readv
+    ssize_t total_read = readv(fd, iov, entry_count);
+    if (total_read == -1) ERR("readv");
+
+    free(iov);
+    fclose(db);
+
+    // Sprawdzenie spójności z indeksem by-title
+    for (size_t i = 0; i < entry_count; i++) {
+        char link_path[1300];
+        snprintf(link_path, sizeof(link_path), "index/by-title/%s", entries[i].title);
+
+        struct stat book_st;
+        if (lstat(link_path, &book_st) == -1) {
+            if (errno == ENOENT) {
+                printf("Book \"%s\" is missing\n", entries[i].title);
+            } else {
+                ERR("lstat verify");
+            }
+        } else {
+            // Pobieramy rozmiar faktycznego pliku docelowego
+            struct stat real_st;
+            if (stat(link_path, &real_st) == -1) ERR("stat real file");
+
+            if ((unsigned int)real_st.st_size != entries[i].size) {
+                printf("Book \"%s\" size mismatch (%u vs %ld)\n", entries[i].title, entries[i].size, (long)real_st.st_size);
+            }
+        }
+    }
+
+    free(entries);
+}
+
+int main(int argc, char *argv[]) {
+    // Sprawdzenie czy katalog index już istnieje (wymaganie: "w katalogu programu stwórz katalog index (jeśli już istnieje zwróć błąd)")
+    struct stat st;
+    if (stat("index", &st) == 0) {
+        fprintf(stderr, "Error: Directory 'index' already exists.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // Tworzenie struktury katalogów indeksu
+    safe_mkdir("index");
+    safe_mkdir("index/by-visible-title");
+    safe_mkdir("index/by-title");
+
+    // Przeszukiwanie biblioteki i budowanie indeksów
+    process_library("library");
+
+    // Jeśli podano ścieżkę do bazy binarnej jako argument (Etap 4)
+    if (argc > 1) {
+        verify_database(argv[1]);
+    }
+
+    return EXIT_SUCCESS;
+}
