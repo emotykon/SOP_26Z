@@ -1417,6 +1417,140 @@ while ((n = getdelim(&buf, &cap, ';', file)) != -1) {
 }
 free(buf);`
   }
+      ,
+  // =========================================================================
+  // 12. ZMIENNE ŚRODOWISKOWE (getenv, setenv, unsetenv, putenv, environ)
+  // =========================================================================
+  {
+    id: "env-functions-full",
+    cat: "12. Zmienne Środowiskowe",
+    title: "Odczyt i zapis zmiennych (getenv, setenv, unsetenv, putenv)",
+    tags: "getenv setenv unsetenv putenv zmienne srodowiskowe systemowe export",
+    code: `/* =========================================================================
+ * Wymagane nagłówki i makra:
+ *   #define _XOPEN_SOURCE 700 (lub _GNU_SOURCE) -> dla setenv / unsetenv / putenv
+ *   #include <stdlib.h>
+ *
+ * WAŻNA ZASADA PROCESOWA:
+ *   Każdy proces otrzymuje KOPIĘ zmiennych środowiskowych swojego rodzica (np. powłoki bash).
+ *   Zmiany dokonane w programie C (przez setenv / unsetenv) dotyczą TYLKO bieżącego procesu
+ *   oraz jego przyszłych procesów potomnych (po fork/exec). NIGDY nie zmieniają zmiennych
+ *   w terminalu (powłoce), z którego program został uruchomiony!
+ *
+ * 1. char *getenv(const char *name)
+ *    - Co robi: Szuka zmiennej środowiskowej o nazwie 'name' i zwraca wskaźnik do jej wartości.
+ *    - Argumenty: name -> nazwa zmiennej BEZ znaku '$' i BEZ '=' (np. "PATH", "HOME", "L1_OUTPUTFILE").
+ *    - Zwraca: Wskaźnik na string z wartością zmiennej.
+ *              UWAGA KRYTYCZNA: Ten wskaźnik wskazuje bezpośrednio na pamięć systemową środowiska!
+ *              NIE WOLNO go modyfikować (np. przez strtok/strcat) ani zwalniać przez free()!
+ *              Jeśli musisz ciąć wartość (np. strtok po ':'), najpierw zrób kopię: strdup(val)!
+ *    - Błąd / Brak zmiennej: Zwraca NULL (nie ustawia errno).
+ *
+ * 2. int setenv(const char *name, const char *value, int overwrite)
+ *    - Co robi: Dodaje nową zmienną 'name' o wartości 'value' lub zmienia istniejącą.
+ *      Funkcja sama alokuje pamięć i kopiuje oba stringi (możesz podać lokalne bufory ze stosu).
+ *    - Argumenty:
+ *        name      -> nazwa zmiennej (nie może zawierać znaku '=')
+ *        value     -> nowa wartość tekstowa
+ *        overwrite -> flaga nadpisywania:
+ *          != 0 (np. 1) : jeśli zmienna już istnieje, NADPISZ jej wartość nową
+ *          == 0         : jeśli zmienna już istnieje, NIE ZMIENIAJ jej (zwróć 0 i zachowaj starą)
+ *    - Zwraca: 0 w razie sukcesu.
+ *    - Błąd:   Zwraca -1 i ustawia errno (EINVAL gdy nazwa ma '=' lub jest pusta, ENOMEM).
+ *
+ * 3. int unsetenv(const char *name)
+ *    - Co robi: Usuwa zmienną 'name' ze środowiska procesu. Jeśli zmiennej nie było,
+ *      funkcja nic nie robi i kończy się sukcesem!
+ *    - Argumenty: name -> nazwa zmiennej do usunięcia.
+ *    - Zwraca: 0 w razie sukcesu; -1 w razie błędu (ustawia errno = EINVAL).
+ *
+ * 4. int putenv(char *string)
+ *    - Co robi: Dodaje/zmienia zmienną podaną jako jeden połączony string "NAZWA=WARTOSC".
+ *    - PUŁAPKA: W przeciwieństwie do setenv(), putenv() NIE KOPIUJE stringa, tylko wpina
+ *      twój wskaźnik bezpośrednio do tablicy środowiska! Dlatego NIE WOLNO podawać do putenv()
+ *      lokalnej tablicy ze stosu (char buf[]), która zniknie po wyjściu z funkcji!
+ *      Zawsze preferuj setenv() zamiast putenv()!
+ *    - Zwraca: 0 w razie sukcesu; wartość != 0 w razie błędu.
+ * ========================================================================= */
+
+// 1. Odczyt zmiennej z wartością domyślną (gdy zmienna nie jest ustawiona):
+char *user = getenv("USER");
+if (user == NULL) {
+    user = "nieznany_uzytkownik";
+}
+printf("Uzytkownik: %s\\n", user);
+
+// 2. Wczytanie liczby ze zmiennej środowiskowej (np. głębokość lub liczba wątków):
+int max_depth = 1;
+char *depth_env = getenv("SOP_DEPTH");
+if (depth_env != NULL) {
+    char *endptr;
+    errno = 0;
+    long val = strtol(depth_env, &endptr, 10);
+    if (errno == 0 && *endptr == '\\0' && val > 0) {
+        max_depth = (int)val;
+    }
+}
+
+// 3. Ustawienie i usunięcie zmiennej w procesie:
+if (setenv("MOJA_ZMIENNA", "wartosc_123", 1) == -1) ERR("setenv");
+printf("Po setenv: %s\\n", getenv("MOJA_ZMIENNA"));
+
+if (unsetenv("MOJA_ZMIENNA") == -1) ERR("unsetenv");`
+  },
+  {
+    id: "env-environ-bash-patterns",
+    cat: "12. Zmienne Środowiskowe",
+    title: "Iteracja po wszystkich zmiennych (environ) + Ustawianie w Terminalu",
+    tags: "environ envp main lista zmiennych strtok export bash terminal",
+    code: `/* =========================================================================
+ * 1. ZMIENNA GLOBALNA: extern char **environ;
+ *    - Co to jest: Tablica wskaźników na wszystkie zmienne środowiskowe procesu w formacie
+ *      "NAZWA=WARTOSC", zakończona wskaźnikiem NULL (identycznie jak argv).
+ *    - Jak uzyskać dostęp: Zadeklaruj 'extern char **environ;' nad funkcją (lub użyj <unistd.h>).
+ *    - Pozwala wypisać lub przeszukać wszystkie zmienne, gdy nie znasz ich dokładnych nazw.
+ *
+ * 2. JAK USTAWIAĆ ZMIENNE W TERMINALU (DO TESTOWANIA PROGRAMU NA LABACH):
+ *    Sposób A (Tylko dla jednego uruchomienia programu - najczęstszy na testach SOP!):
+ *      $ L1_OUTPUTFILE="wynik.txt" ./moj_program -o -p .
+ *
+ *    Sposób B (Na stałe w bieżącym oknie terminala przez export):
+ *      $ export L1_OUTPUTFILE="wynik.txt"
+ *      $ ./moj_program -o -p .
+ *      $ unset L1_OUTPUTFILE   # usunięcie zmiennej z terminala
+ *
+ *    Sposób C (W CLionie):
+ *      Run -> Edit Configurations -> pole "Environment variables" -> wpisz: L1_OUTPUTFILE=wynik.txt
+ * ========================================================================= */
+
+extern char **environ;
+
+// WZORZEC 1: Wypisanie wszystkich zmiennych środowiskowych procesu (odpowiednik komendy 'env')
+void print_all_env(void) {
+    for (char **env = environ; *env != NULL; env++) {
+        printf("%s\\n", *env); // Wypisze np. "HOME=/home/jakub"
+    }
+}
+
+// WZORZEC 2: Bezpieczne cięcie zmiennej zawierającej listę ścieżek (np. PATH="/bin:/usr/bin:/local/bin")
+// PAMIĘTAJ: Nie wolno robić strtok bezpośrednio na wyniku getenv()! Najpierw robimy strdup()!
+void parse_colon_env(const char *var_name) {
+    char *raw = getenv(var_name);
+    if (raw == NULL) return;
+
+    char *copy = strdup(raw); // Kopia do modyfikowalnej pamięci na stercie
+    if (copy == NULL) ERR("strdup");
+
+    char *saveptr;
+    char *dir = strtok_r(copy, ":", &saveptr);
+    while (dir != NULL) {
+        printf("Katalog ze zmiennej %s: %s\\n", var_name, dir);
+        dir = strtok_r(NULL, ":", &saveptr);
+    }
+
+    free(copy); // Zwalniamy kopię!
+}`
+  }
 ];
 
     // =========================================================================
