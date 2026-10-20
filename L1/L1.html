@@ -1359,6 +1359,64 @@ while ((n = getdelim(&buf, &cap, ';', file)) != -1) {
 }
 free(buf);`
   }
+      ,
+  {
+    id: "parse-delimiters-semicolon",
+    cat: "11. Pisanie i Czytanie (*printf / *scanf)",
+    title: "Wczytywanie danych rozdzielonych separatorem np. ';' (%[^;], strtok_r, getdelim)",
+    tags: "srednik csv separator sscanf strtok strtok_r strsep getdelim kolumny",
+    code: `/* =========================================================================
+ * 3 METODY PARSOWANIA DANYCH Z SEPARATOREM (np. ';', ':', ','):
+ *
+ * METODA 1: sscanf z formatem %[^;] (Gdy znasz liczbę kolumn, obsługuje spacje w środku!)
+ *    - %127[^;]    : czytaj wszystko (łącznie ze spacjami) aż napotkasz znak ';'
+ *    - %127[^\\r\\n] : czytaj ostatnią kolumnę aż do znaku końca linii
+ *
+ * METODA 2: char *strtok_r(char *str, const char *delim, char **saveptr)
+ *    - Co robi: Tnie edytowalny bufor 'str' na kawałki w miejscach wystąpienia znaków z 'delim'
+ *      (zamienia ';' na '\\0').
+ *    - Pierwsze wywołanie: przekazujesz bufor 'line'.
+ *    - Kolejne wywołania w pętli: przekazujesz NULL jako pierwszy argument!
+ *    - Zwraca: Wskaźnik na kolejny wycięty token lub NULL, gdy brak kolejnych.
+ *
+ * METODA 3: ssize_t getdelim(char **lineptr, size_t *n, int delimiter, FILE *stream)
+ *    - Co robi: Działa dokładnie jak getline(), ale zamiast czytać do '\\n', czyta z pliku
+ *      aż do podanego znaku 'delimiter' (np. ';').
+ * ========================================================================= */
+
+// PRZYKŁAD 1: Stałe kolumny rozdzielone ';' (sscanf %[^;])
+char line[256];
+char name[128], city[128];
+int age;
+
+while (fgets(line, sizeof(line), file) != NULL) {
+    if (sscanf(line, "%127[^;];%d;%127[^\\r\\n]", name, &age, city) == 3) {
+        printf("Imie: %s | Wiek: %d | Miasto: %s\\n", name, age, city);
+    }
+}
+
+// PRZYKŁAD 2: Dowolna liczba kolumn rozdzielonych ';' w linii (strtok_r)
+while (fgets(line, sizeof(line), file) != NULL) {
+    line[strcspn(line, "\\r\\n")] = '\\0'; // Obcinamy '\\n' z końca linii
+
+    char *saveptr;
+    char *token = strtok_r(line, ";", &saveptr);
+    while (token != NULL) {
+        printf("Kolumna: %s\\n", token);
+        token = strtok_r(NULL, ";", &saveptr);
+    }
+}
+
+// PRZYKŁAD 3: Czytanie z pliku bezpośrednio do znaku ';' (getdelim)
+char *buf = NULL;
+size_t cap = 0;
+ssize_t n;
+while ((n = getdelim(&buf, &cap, ';', file)) != -1) {
+    if (n > 0 && buf[n - 1] == ';') buf[n - 1] = '\\0';
+    printf("Pole: %s\\n", buf);
+}
+free(buf);`
+  }
 ];
 
     // =========================================================================
