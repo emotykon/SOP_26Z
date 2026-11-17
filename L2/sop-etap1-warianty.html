@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SOP L2 — Warianty Etapu 1 (Kody startowe)</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --code-bg: #090c10;
+      --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font-sans); line-height: 1.5; padding: 24px; }
+    .wrap { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+    h1 { font-size: 1.25rem; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .head { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .title { font-family: var(--font-mono); font-size: 0.96rem; font-weight: 700; color: var(--accent); }
+    .sub { font-size: 0.82rem; color: var(--muted); margin-top: 2px; }
+    .copy-btn { background: var(--code-bg); border: 1px solid var(--border); color: var(--text); padding: 5px 11px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+    pre { background: var(--code-bg); padding: 14px; overflow-x: auto; font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.45; color: #d2a8ff; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SOP L2 — 3 Warianty Etapu 1 (Gotowe Kody)</h1>
+
+  <div class="card">
+    <div class="head">
+      <div>
+        <div class="title">Wariant 1: Binarna tablica struktur (ftruncate + mmap + msync)</div>
+        <div class="sub">./prog baza.bin 5 — tworzy plik N rekordów lub sprawdza rozmiar istniejącego</div>
+      </div>
+      <button class="copy-btn" onclick="copyCode('c1', this)">Kopiuj kod</button>
+    </div>
+    <pre><code id="c1">#define _POSIX_C_SOURCE 200809L
+
+#include &lt;errno.h&gt;
+#include &lt;fcntl.h&gt;
+#include &lt;stdbool.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;sys/mman.h&gt;
+#include &lt;sys/stat.h&gt;
+#include &lt;unistd.h&gt;
+
+#define ERR(source) (perror(source), fprintf(stderr, "%s:%d\n", __FILE__, __LINE__), exit(EXIT_FAILURE))
+
+typedef struct
+{
+    int id;
+    int active;
+    double value;
+    char label[24];
+} Record;
+
+int main(int argc, char *argv[])
+{
+    if (argc != 3)
+    {
+        fprintf(stderr, "USAGE: %s &lt;db_file&gt; &lt;count&gt;\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    char *endptr;
+    long n = strtol(argv[2], &amp;endptr, 10);
+    if (*endptr != '\0' || n &lt;= 0 || n &gt; 1024)
+    {
+        fprintf(stderr, "Nieprawidłowa liczba rekordów!\n");
+        return EXIT_FAILURE;
+    }
+
+    size_t expected_size = (size_t)n * sizeof(Record);
+    bool is_new = false;
+
+    int fd = open(argv[1], O_RDWR);
+    if (fd == -1)
+    {
+        if (errno != ENOENT)
+            ERR("open");
+        fd = open(argv[1], O_RDWR | O_CREAT, 0666);
+        if (fd == -1)
+            ERR("open create");
+        if (ftruncate(fd, (off_t)expected_size) == -1)
+            ERR("ftruncate");
+        is_new = true;
+    }
+    else
+    {
+        struct stat st;
+        if (fstat(fd, &amp;st) == -1)
+            ERR("fstat");
+        if ((size_t)st.st_size != expected_size)
+        {
+            fprintf(stderr, "Zły rozmiar pliku: jest %lld B, oczekiwano %zu B\n",
+                    (long long)st.st_size, expected_size);
+            close(fd);
+            return EXIT_FAILURE;
+        }
+    }
+
+    Record *db = mmap(NULL, expected_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (db == MAP_FAILED)
+        ERR("mmap");
+
+    if (is_new)
+    {
+        for (long i = 0; i &lt; n; i++)
+        {
+            db[i].id = (int)i;
+            db[i].active = 0;
+            db[i].value = 0.0;
+            snprintf(db[i].label, sizeof(db[i].label), "SLOT_%02ld", i);
+        }
+        if (msync(db, expected_size, MS_SYNC) == -1)
+            ERR("msync");
+        printf("Utworzono nową bazę (%ld rekordów):\n", n);
+    }
+    else
+    {
+        printf("Wczytano istniejącą bazę (%ld rekordów):\n", n);
+    }
+
+    for (long i = 0; i &lt; n; i++)
+        printf("[%d] label=%s active=%d val=%.2f\n", db[i].id, db[i].label, db[i].active, db[i].value);
+
+    if (munmap(db, expected_size) == -1)
+        ERR("munmap");
+    if (close(fd) == -1)
+        ERR("close");
+
+    return EXIT_SUCCESS;
+}</code></pre>
+  </div>
+
+  <div class="card">
+    <div class="head">
+      <div>
+        <div class="title">Wariant 2: Parsowanie pliku tekstowego ID:NAZWA do pliku binarnego (read + memchr + writev)</div>
+        <div class="sub">./prog input.txt output.bin — czyta strumień po \n, waliduje i zapisuje przez writev()</div>
+      </div>
+      <button class="copy-btn" onclick="copyCode('c2', this)">Kopiuj kod</button>
+    </div>
+    <pre><code id="c2">#define _POSIX_C_SOURCE 200809L
+
+#include &lt;ctype.h&gt;
+#include &lt;errno.h&gt;
+#include &lt;fcntl.h&gt;
+#include &lt;stdbool.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;sys/uio.h&gt;
+#include &lt;unistd.h&gt;
+
+#define ERR(source) (perror(source), fprintf(stderr, "%s:%d\n", __FILE__, __LINE__), exit(EXIT_FAILURE))
+#define BUF_SIZE 256
+
+bool parse_and_save_record(int out_fd, const char *line)
+{
+    const char *colon = strchr(line, ':');
+    if (!colon || colon == line)
+        return false;
+
+    for (const char *p = line; p &lt; colon; p++)
+        if (!isdigit((unsigned char)*p))
+            return false;
+
+    char *endptr;
+    long id_long = strtol(line, &amp;endptr, 10);
+    if (endptr != colon || id_long &lt; 0 || id_long &gt; 10000)
+        return false;
+
+    int id = (int)id_long;
+    char name[32] = {0};
+    snprintf(name, sizeof(name), "%s", colon + 1);
+
+    struct iovec iov[2] = {
+        {.iov_base = &amp;id, .iov_len = sizeof(id)},
+        {.iov_base = name, .iov_len = sizeof(name)}
+    };
+
+    ssize_t w;
+    while ((w = writev(out_fd, iov, 2)) == -1 &amp;&amp; errno == EINTR)
+        ;
+    if (w != (ssize_t)(sizeof(id) + sizeof(name)))
+        ERR("writev");
+
+    return true;
+}
+
+int main(int argc, char *argv[])
+{
+    if (argc != 3)
+    {
+        fprintf(stderr, "USAGE: %s &lt;input.txt&gt; &lt;output.bin&gt;\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    int in_fd = open(argv[1], O_RDONLY);
+    if (in_fd == -1)
+        ERR("open input");
+
+    int out_fd = open(argv[2], O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (out_fd == -1)
+    {
+        close(in_fd);
+        ERR("open output");
+    }
+
+    char buf[BUF_SIZE];
+    size_t len = 0;
+    int valid = 0, invalid = 0;
+
+    while (1)
+    {
+        ssize_t r = read(in_fd, buf + len, sizeof(buf) - 1 - len);
+        if (r &gt; 0)
+        {
+            len += (size_t)r;
+            buf[len] = '\0';
+
+            char *nl;
+            while ((nl = memchr(buf, '\n', len)) != NULL)
+            {
+                *nl = '\0';
+                if (parse_and_save_record(out_fd, buf))
+                    valid++;
+                else
+                    invalid++;
+
+                size_t used = (size_t)(nl - buf) + 1;
+                len -= used;
+                memmove(buf, nl + 1, len);
+                buf[len] = '\0';
+            }
+        }
+        else if (r == 0)
+        {
+            if (len &gt; 0)
+            {
+                if (parse_and_save_record(out_fd, buf))
+                    valid++;
+                else
+                    invalid++;
+            }
+            break;
+        }
+        else
+        {
+            if (errno == EINTR)
+                continue;
+            ERR("read input");
+        }
+    }
+
+    printf("Załadowano rekordów: %d (odrzucono błędnych linii: %d)\n", valid, invalid);
+
+    close(in_fd);
+    close(out_fd);
+    return EXIT_SUCCESS;
+}</code></pre>
+  </div>
+
+  <div class="card">
+    <div class="head">
+      <div>
+        <div class="title">Wariant 3: Serwer własnych FIFO (mkfifo + O_RDWR | O_NONBLOCK) + STDIN w poll()</div>
+        <div class="sub">./prog 3 — tworzy N kanałów FIFO oraz nasłuchuje klawiatury w jednym poll()</div>
+      </div>
+      <button class="copy-btn" onclick="copyCode('c3', this)">Kopiuj kod</button>
+    </div>
+    <pre><code id="c3">#define _POSIX_C_SOURCE 200809L
+
+#include &lt;errno.h&gt;
+#include &lt;fcntl.h&gt;
+#include &lt;poll.h&gt;
+#include &lt;stdbool.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;sys/stat.h&gt;
+#include &lt;unistd.h&gt;
+
+#define ERR(source) (perror(source), fprintf(stderr, "%s:%d\n", __FILE__, __LINE__), exit(EXIT_FAILURE))
+#define MAX_CHANS 8
+#define BUF_SIZE 128
+
+void set_nonblocking(int fd)
+{
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags == -1)
+        ERR("fcntl F_GETFL");
+    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+        ERR("fcntl F_SETFL");
+}
+
+int main(int argc, char *argv[])
+{
+    if (argc != 2)
+    {
+        fprintf(stderr, "USAGE: %s &lt;num_channels&gt;\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    int n = atoi(argv[1]);
+    if (n &lt;= 0 || n &gt; MAX_CHANS)
+    {
+        fprintf(stderr, "Liczba kanałów musi być z zakresu 1..%d\n", MAX_CHANS);
+        return EXIT_FAILURE;
+    }
+
+    struct pollfd fds[MAX_CHANS + 1];
+    char names[MAX_CHANS + 1][32];
+
+    set_nonblocking(STDIN_FILENO);
+    fds[0].fd = STDIN_FILENO;
+    fds[0].events = POLLIN;
+    fds[0].revents = 0;
+
+    for (int i = 1; i &lt;= n; i++)
+    {
+        snprintf(names[i], sizeof(names[i]), "chan_%d", i - 1);
+        if (mkfifo(names[i], 0666) == -1 &amp;&amp; errno != EEXIST)
+            ERR("mkfifo");
+
+        fds[i].fd = open(names[i], O_RDWR | O_NONBLOCK);
+        if (fds[i].fd == -1)
+            ERR("open fifo");
+
+        fds[i].events = POLLIN;
+        fds[i].revents = 0;
+        printf("Gotowy kanał: %s\n", names[i]);
+    }
+
+    printf("Wpisz 'quit' aby zakończyć (lub wyślij coś przez echo &gt; chan_0)...\n");
+
+    char buf[BUF_SIZE];
+    bool running = true;
+
+    while (running)
+    {
+        int ready = poll(fds, (nfds_t)(n + 1), 3000);
+        if (ready &lt; 0)
+        {
+            if (errno == EINTR)
+                continue;
+            ERR("poll");
+        }
+        if (ready == 0)
+        {
+            printf("Oczekiwanie (timeout 3s)...\n");
+            continue;
+        }
+
+        for (int i = 0; i &lt;= n; i++)
+        {
+            if (fds[i].fd == -1 || !(fds[i].revents &amp; POLLIN))
+                continue;
+
+            while (1)
+            {
+                ssize_t r = read(fds[i].fd, buf, sizeof(buf) - 1);
+                if (r &gt; 0)
+                {
+                    buf[r] = '\0';
+                    if (i == 0 &amp;&amp; strncmp(buf, "quit", 4) == 0)
+                    {
+                        running = false;
+                        break;
+                    }
+                    printf("[%s]: %s", i == 0 ? "STDIN" : names[i], buf);
+                    fflush(stdout);
+                }
+                else if (r == 0)
+                {
+                    if (i == 0)
+                        running = false;
+                    break;
+                }
+                else
+                {
+                    if (errno == EAGAIN || errno == EWOULDBLOCK)
+                        break;
+                    if (errno == EINTR)
+                        continue;
+                    ERR("read");
+                }
+            }
+        }
+    }
+
+    for (int i = 1; i &lt;= n; i++)
+    {
+        close(fds[i].fd);
+        unlink(names[i]);
+    }
+
+    return EXIT_SUCCESS;
+}</code></pre>
+  </div>
+</div>
+
+<script>
+function copyCode(id, btn) {
+  const text = document.getElementById(id).textContent;
+  navigator.clipboard.writeText(text);
+  const old = btn.textContent;
+  btn.textContent = "Skopiowano!";
+  setTimeout(() => (btn.textContent = old), 1200);
+}
+</script>
+</body>
+</html>
