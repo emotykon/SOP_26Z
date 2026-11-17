@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SOP L2 — Kompletne Kompendium: Klocki, Szablony & Dokumentacja I/O</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --yellow: #d29922;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --code-bg: #090c10;
+      --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      line-height: 1.5;
+      padding-bottom: 60px;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(13, 17, 23, 0.94);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+    }
+
+    .header-inner {
+      max-width: 1520px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .top-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand h1 { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.02em; }
+
+    .badge-header {
+      background: rgba(88, 166, 255, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(88, 166, 255, 0.35);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+
+    .tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    .tab-btn {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 0.84rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .tab-btn:hover { color: var(--text); border-color: var(--muted); }
+    .tab-btn.active {
+      background: var(--accent);
+      color: #0d1117;
+      border-color: var(--accent);
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .search-wrap { flex: 1 1 320px; max-width: 480px; }
+
+    .search-wrap input {
+      width: 100%;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    .search-wrap input:focus { border-color: var(--accent); }
+
+    .filters { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    .filter-btn {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+
+    .filter-btn:hover { color: var(--text); border-color: var(--muted); }
+    .filter-btn.active {
+      background: rgba(88, 166, 255, 0.16);
+      color: var(--accent);
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+
+    main { max-width: 1520px; margin: 22px auto; padding: 0 24px; }
+
+    .quick-rules {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--yellow);
+      border-radius: 8px;
+      padding: 13px 18px;
+      margin-bottom: 22px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+      gap: 12px;
+      font-size: 0.83rem;
+    }
+
+    .quick-rules div strong {
+      color: var(--yellow);
+      font-family: var(--font-mono);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(560px, 1fr));
+      gap: 16px;
+    }
+
+    .grid.wide-view {
+      grid-template-columns: 1fr;
+    }
+
+    @media (max-width: 680px) { .grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .card-head {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      background: rgba(255, 255, 255, 0.015);
+    }
+
+    .card-title {
+      font-family: var(--font-mono);
+      font-size: 0.98rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .card-sub {
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--purple);
+      margin-top: 2px;
+    }
+
+    .cat-tag {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: rgba(63, 185, 80, 0.14);
+      color: var(--green);
+      border: 1px solid rgba(63, 185, 80, 0.35);
+      white-space: nowrap;
+    }
+
+    .cat-tag.tpl {
+      background: rgba(88, 166, 255, 0.14);
+      color: var(--accent);
+      border-color: rgba(88, 166, 255, 0.35);
+    }
+
+    .cat-tag.ref {
+      background: rgba(188, 140, 255, 0.12);
+      color: var(--purple);
+      border-color: rgba(188, 140, 255, 0.3);
+    }
+
+    .card-body {
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+    }
+
+    .desc { font-size: 0.88rem; color: var(--text); }
+
+    .io-hint {
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+      color: var(--yellow);
+      background: rgba(210, 153, 34, 0.08);
+      border: 1px solid rgba(210, 153, 34, 0.25);
+      padding: 6px 10px;
+      border-radius: 5px;
+    }
+
+    .checklist {
+      list-style: none;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 6px 16px;
+      font-size: 0.83rem;
+      background: rgba(63, 185, 80, 0.06);
+      border: 1px solid rgba(63, 185, 80, 0.25);
+      border-radius: 6px;
+      padding: 10px 14px;
+    }
+
+    .checklist li::before {
+      content: "✓ ";
+      color: var(--green);
+      font-weight: bold;
+    }
+
+    .sig {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      padding: 7px 10px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #ff7b72;
+      overflow-x: auto;
+    }
+
+    .meta-box {
+      font-size: 0.81rem;
+      background: rgba(0, 0, 0, 0.22);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .meta-box strong { font-family: var(--font-mono); color: var(--green); }
+    .meta-box .warn strong { color: var(--red); }
+
+    .flags-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+    .flags-table th, .flags-table td {
+      border: 1px solid var(--border);
+      padding: 5px 7px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .flags-table th { background: rgba(255, 255, 255, 0.04); color: var(--muted); }
+    .flags-table code { font-family: var(--font-mono); color: var(--yellow); font-weight: 600; }
+
+    .code-wrap { position: relative; margin-top: auto; }
+
+    .copy-btn {
+      position: absolute;
+      top: 7px;
+      right: 7px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 4px 9px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.79rem;
+      line-height: 1.45;
+      color: #d2a8ff;
+    }
+
+    code { font-family: var(--font-mono); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="top-bar">
+      <div class="brand">
+        <h1>SOP L2 — Klocki, Szablony & Ściąga I/O</h1>
+        <span class="badge-header" id="count-badge">0 pozycji</span>
+      </div>
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="blocks">1. Małe Klocki Funkcyjne (17 szt.)</button>
+        <button class="tab-btn" data-tab="templates">2. Pełne Szablony Programów (5 szt.)</button>
+        <button class="tab-btn" data-tab="functions">3. Dokumentacja Funkcji & Flag (11 kart)</button>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="search-wrap">
+        <input type="text" id="search" placeholder="Szukaj klocka, szablonu, funkcji lub flagi (np. POLLOUT, O_RDWR, memmove, mmap)... [ / ]" />
+      </div>
+      <div class="filters" id="filters"></div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="quick-rules">
+    <div><strong>Zasada 1 (mkfifo):</strong> <code>mkfifo()</code> zwraca <code>0</code> lub <code>-1</code> — <strong>NIGDY deskryptor!</strong> Po <code>mkfifo</code> musisz wywołać <code>open()</code>.</div>
+    <div><strong>Zasada 2 (Typy ze znakiem):</strong> <code>read</code>/<code>write</code>/<code>writev</code> zwracają <code>ssize_t</code> (nigdy <code>size_t</code>!), a <code>lseek</code> zwraca <code>off_t</code>.</div>
+    <div><strong>Zasada 3 (Poll + FIFO):</strong> Zawsze opróżniaj <code>POLLIN</code> w pętli do <code>EAGAIN</code> <em>ZANIM</em> zamkniesz deskryptor przez <code>POLLHUP</code>. Przy <code>POLLOUT</code> wyłączaj flagę (<code>events &= ~POLLOUT</code>) po wysłaniu całości!</div>
+    <div><strong>Zasada 4 (Mmap + Stringi):</strong> Zmapowany plik NIE ma <code>'\0'</code> na końcu — używaj <code>memchr</code> lub zrób kopię z <code>'\0'</code> przed <code>strstr</code>.</div>
+  </section>
+
+  <div class="grid" id="cards-grid"></div>
+</main>
+
+<script>
+// 1. MAŁE KLOCKI FUNKCYJNE (10-25 linii, bez duplikatów)
+const BLOCKS = [
+  {
+    title: "set_nonblocking(int fd)",
+    sub: "Modyfikuje istniejący deskryptor (np. STDIN_FILENO, pipe, fifo)",
+    category: "Deskryptory & I/O",
+    desc: "Włącza tryb nieblokujący bez nadpisywania pozostałych flag deskryptora (F_GETFL -> OR -> F_SETFL).",
+    io: "IN: otwarty fd | OUT: void (lub ERR)",
+    code: `void set_nonblocking(int fd) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags == -1) ERR("fcntl F_GETFL");
+    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) ERR("fcntl F_SETFL");
+}`
+  },
+  {
+    title: "bulk_read(int fd, char *buf, size_t count)",
+    sub: "Pełny odczyt N bajtów odporny na sygnały (EINTR) i częściowe read()",
+    category: "Deskryptory & I/O",
+    desc: "Czyta dokładnie count bajtów (chyba że wcześniej wystąpi EOF). Zwraca liczbę przeczytanych bajtów lub -1.",
+    io: "IN: fd, bufor, ile bajtów | OUT: ssize_t (0..count lub -1)",
+    code: `ssize_t bulk_read(int fd, char *buf, size_t count) {
+    ssize_t c, len = 0;
+    while (count > 0) {
+        c = read(fd, buf, count);
+        if (c < 0) {
+            if (errno == EINTR) continue;
+            return -1;
+        }
+        if (c == 0) return len; // EOF
+        buf += c;
+        len += c;
+        count -= (size_t)c;
+    }
+    return len;
+}`
+  },
+  {
+    title: "bulk_write(int fd, const char *buf, size_t count)",
+    sub: "Pełny zapis N bajtów odporny na EINTR i częściowe write()",
+    category: "Deskryptory & I/O",
+    desc: "Zapisuje dokładnie count bajtów z bufora. Używaj przy zapisie rekordów do pliku lub komunikatu do pipe.",
+    io: "IN: fd, dane, ile bajtów | OUT: ssize_t (count lub -1)",
+    code: `ssize_t bulk_write(int fd, const char *buf, size_t count) {
+    ssize_t c, len = 0;
+    while (count > 0) {
+        c = write(fd, buf, count);
+        if (c < 0) {
+            if (errno == EINTR) continue;
+            return -1;
+        }
+        buf += c;
+        len += c;
+        count -= (size_t)c;
+    }
+    return len;
+}`
+  },
+  {
+    title: "write_scatter_packet(int fd, const char *hdr, const char *body)",
+    sub: "Atomowy zapis nagłówka + treści + '\\n' jednym wywołaniem writev()",
+    category: "Deskryptory & I/O",
+    desc: "Wysyła trzy oddzielne fragmenty danych do FIFO/pliku bez sklejania ich w dodatkowym buforze (idealne do protokołów typu \"07:treść\\n\").",
+    io: "IN: fd, nagłówek, treść | OUT: ssize_t (zapisane bajty)",
+    code: `ssize_t write_scatter_packet(int fd, const char *hdr, const char *body) {
+    char nl = '\\n';
+    struct iovec iov[3] = {
+        { .iov_base = (void *)hdr,  .iov_len = strlen(hdr) },
+        { .iov_base = (void *)body, .iov_len = strlen(body) },
+        { .iov_base = &nl,          .iov_len = 1 }
+    };
+    ssize_t w;
+    while ((w = writev(fd, iov, 3)) == -1 && errno == EINTR)
+        ;
+    if (w == -1) ERR("writev");
+    return w;
+}`
+  },
+  {
+    title: "flush_pollout_step(struct pollfd *slot, const char *buf, size_t *sent, size_t total)",
+    sub: "Nieblokujące wysyłanie kolejnej porcji danych po wybudzeniu POLLOUT",
+    category: "FIFO & Poll",
+    desc: "Wysyła tyle bajtów ile przyjmie bufor jądra. Gdy *sent == total, automatycznie zdejmuje flagę POLLOUT z slot->events, żeby poll() nie zjadał 100% CPU.",
+    io: "IN: &fds[i], out_buf, &out_sent, out_len | OUT: true (wysłano całość) / false (została reszta)",
+    code: `// Przed pętlą poll() ustaw: slot->events |= POLLOUT; (pamiętaj o signal(SIGPIPE, SIG_IGN))
+bool flush_pollout_step(struct pollfd *slot, const char *buf, size_t *sent, size_t total) {
+    while (*sent < total) {
+        ssize_t w = write(slot->fd, buf + *sent, total - *sent);
+        if (w > 0) {
+            *sent += (size_t)w;
+        } else if (w == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) return false; // Bufor pełny, czekaj na kolejny POLLOUT
+            if (errno == EINTR) continue;
+            ERR("write pollout");
+        }
+    }
+    slot->events &= ~POLLOUT; // KRYTYCZNE: wyłącz POLLOUT gdy kolejka jest pusta!
+    return true;
+}`
+  },
+  {
+    title: "open_fifo_existing(const char *path)",
+    sub: "Weryfikuje czy istnieje FIFO (S_ISFIFO) i otwiera je do nieblokującego odczytu",
+    category: "FIFO & Poll",
+    desc: "Użyj gdy inny proces już utworzył FIFO i ma dyktować dane aż do EOF (wzorzec odbiornika jak w sop-cake).",
+    io: "IN: ścieżka do FIFO | OUT: fd (O_RDONLY | O_NONBLOCK)",
+    code: `int open_fifo_existing(const char *path) {
+    struct stat st;
+    if (stat(path, &st) == -1 || !S_ISFIFO(st.st_mode)) {
+        fprintf(stderr, "Brak FIFO: %s\\n", path);
+        exit(EXIT_FAILURE);
+    }
+    int fd = open(path, O_RDONLY | O_NONBLOCK);
+    if (fd == -1) ERR("open fifo");
+    return fd;
+}`
+  },
+  {
+    title: "create_fifo_server(const char *path)",
+    sub: "Tworzy FIFO (mkfifo) i otwiera z O_RDWR | O_NONBLOCK (brak fałszywego POLLHUP)",
+    category: "FIFO & Poll",
+    desc: "Użyj gdy Twój program jest serwerem, a klienci będą podłączać się wielokrotnie w trakcie działania (np. echo > fi1).",
+    io: "IN: nazwa FIFO | OUT: fd (O_RDWR | O_NONBLOCK)",
+    code: `int create_fifo_server(const char *path) {
+    if (mkfifo(path, 0666) == -1 && errno != EEXIST)
+        ERR("mkfifo");
+    int fd = open(path, O_RDWR | O_NONBLOCK);
+    if (fd == -1) ERR("open fifo server");
+    return fd;
+}`
+  },
+  {
+    title: "attach_stdin_to_poll(struct pollfd *slot)",
+    sub: "Podpina klawiaturę (STDIN_FILENO) do pętli poll() razem z łączami FIFO",
+    category: "FIFO & Poll",
+    desc: "Ustawia STDIN w tryb nieblokujący i konfiguruje slot w tablicy pollfd. Pozwala wpisać np. 'quit' podczas czekania na dane z FIFO.",
+    io: "IN: wskaźnik na slot &fds[idx] | OUT: void (slot gotowy do poll)",
+    code: `void attach_stdin_to_poll(struct pollfd *slot) {
+    set_nonblocking(STDIN_FILENO);
+    slot->fd = STDIN_FILENO;
+    slot->events = POLLIN;
+    slot->revents = 0;
+}
+
+// W pętli poll() po sprawdzeniu fds[stdin_idx].revents & POLLIN:
+// drain_nonblock_chunk(...) -> pop_next_line(...) -> if (strcmp(line, "quit") == 0) break;`
+  },
+  {
+    title: "drain_nonblock_chunk(int fd, char *buf, size_t *len, size_t cap)",
+    sub: "Czyta wszystko z nieblokującego fd aż do EAGAIN lub EOF (zwraca false przy EOF)",
+    category: "FIFO & Poll",
+    desc: "Wklejasz wewnątrz if (fds[i].revents & POLLIN). Dopisuje dane na koniec bufora buf[*len] i aktualizuje *len.",
+    io: "IN: fd, buf, &len, sizeof(buf) | OUT: true (działa) / false (EOF)",
+    code: `bool drain_nonblock_chunk(int fd, char *buf, size_t *len, size_t cap) {
+    while (1) {
+        ssize_t r = read(fd, buf + *len, cap - 1 - *len);
+        if (r > 0) {
+            *len += (size_t)r;
+            buf[*len] = '\\0';
+        } else if (r == 0) {
+            return false; // EOF
+        } else {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) return true;
+            if (errno == EINTR) continue;
+            ERR("read");
+        }
+    }
+}`
+  },
+  {
+    title: "open_or_init_file(const char *path, size_t expected_size)",
+    sub: "Otwiera plik (i sprawdza rozmiar) albo tworzy nowy o zadanym rozmiarze",
+    category: "Pliki & Rekordy",
+    desc: "Jeśli plik nie istnieje (ENOENT), tworzy go i wypełnia spacjami po 63 znaki + '\\n'. Jeśli istnieje, weryfikuje jego rozmiar przez lseek.",
+    io: "IN: ścieżka, oczekiwany rozmiar | OUT: otwarty fd (O_RDWR)",
+    code: `int open_or_init_file(const char *path, size_t expected_size) {
+    int fd = open(path, O_RDWR);
+    if (fd == -1) {
+        if (errno != ENOENT) ERR("open");
+        fd = open(path, O_RDWR | O_CREAT, 0666);
+        if (fd == -1) ERR("open create");
+
+        char line[64];
+        memset(line, ' ', 63);
+        line[63] = '\\n';
+        for (size_t i = 0; i < expected_size / 64; i++)
+            if (bulk_write(fd, line, 64) != 64) ERR("write");
+    } else {
+        off_t sz = lseek(fd, 0, SEEK_END);
+        if (sz == -1) ERR("lseek");
+        if ((size_t)sz != expected_size) {
+            close(fd);
+            fprintf(stderr, "Zły rozmiar pliku!\\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+    return fd;
+}`
+  },
+  {
+    title: "write_fixed_line(int fd, int row, const char *text)",
+    sub: "Skacze pod row * 64 (lseek) i zapisuje 63 znaki dopełnione spacjami + '\\n'",
+    category: "Pliki & Rekordy",
+    desc: "Nadpisuje konkretny wiersz w pliku rekordowym, czyszcząc stare resztki spacjami i przycinając tekst > 63 znaków.",
+    io: "IN: fd pliku, nr wiersza (0..N-1), tekst | OUT: void",
+    code: `void write_fixed_line(int fd, int row, const char *text) {
+    char line[64];
+    memset(line, ' ', 63);
+    line[63] = '\\n';
+
+    size_t len = strlen(text);
+    if (len > 63) len = 63;
+    memcpy(line, text, len);
+
+    if (lseek(fd, (off_t)row * 64, SEEK_SET) == -1) ERR("lseek");
+    if (bulk_write(fd, line, 64) != 64) ERR("write line");
+}`
+  },
+  {
+    title: "pop_next_line(char *buf, size_t *len, char *out_line)",
+    sub: "Wyciąga z bufora jedną linię zakończoną '\\n' i przesuwa resztę (memmove)",
+    category: "Stringi & Bufory",
+    desc: "Wywołuj w pętli: while (pop_next_line(buf, &len, line)) { ... }. Zwraca true jeśli wycięto pełną linię, false gdy brak '\\n'.",
+    io: "IN: buf, &len, wyjściowy out_line | OUT: bool",
+    code: `bool pop_next_line(char *buf, size_t *len, char *out_line) {
+    char *nl = memchr(buf, '\\n', *len);
+    if (!nl) return false;
+
+    size_t line_len = (size_t)(nl - buf);
+    memcpy(out_line, buf, line_len);
+    out_line[line_len] = '\\0';
+
+    size_t consumed = line_len + 1;
+    *len -= consumed;
+    memmove(buf, nl + 1, *len);
+    buf[*len] = '\\0';
+    return true;
+}`
+  },
+  {
+    title: "parse_prefixed_int(const char *msg, int min_v, int max_v, const char **rest)",
+    sub: "Waliduje format \"LICZBA:reszta\" (tylko cyfry przed ':') i zwraca liczbę",
+    category: "Stringi & Bufory",
+    desc: "Zwraca sparsowaną liczbę z zakresu [min_v..max_v] i ustawia *rest na tekst po dwukropku, albo zwraca -1 przy błędnym formacie.",
+    io: "IN: napis, min, max, &rest | OUT: int (>= 0) lub -1 przy błędzie",
+    code: `int parse_prefixed_int(const char *msg, int min_v, int max_v, const char **rest) {
+    const char *colon = strchr(msg, ':');
+    if (!colon || colon == msg) return -1;
+
+    for (const char *p = msg; p < colon; p++)
+        if (!isdigit((unsigned char)*p)) return -1;
+
+    char *endptr;
+    long val = strtol(msg, &endptr, 10);
+    if (endptr != colon || val < min_v || val > max_v) return -1;
+
+    *rest = colon + 1;
+    return (int)val;
+}`
+  },
+  {
+    title: "map_file_rw(int fd, size_t size)",
+    sub: "Mapuje plik (otwarty z O_RDWR) do pamięci z prawem zapisu",
+    category: "Pamięć (mmap)",
+    desc: "Skraca boilerplate mmap() z poprawnym sprawdzeniem MAP_FAILED.",
+    io: "IN: fd (O_RDWR), rozmiar > 0 | OUT: char* (wskaźnik do pamięci)",
+    code: `char *map_file_rw(int fd, size_t size) {
+    char *map = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (map == MAP_FAILED) ERR("mmap");
+    return map;
+}`
+  },
+  {
+    title: "replace_same_len_in_mmap(char *map, size_t size, const char *old_w, const char *new_w)",
+    sub: "Bezpiecznie podmienia wszystkie wystąpienia słowa o tej samej długości w mmap",
+    category: "Pamięć (mmap)",
+    desc: "Tworzy bezpieczną kopię z '\\0' na końcu (chroni strstr przed wyjściem poza stronę pamięci), podmienia w map i zwraca liczbę zmian.",
+    io: "IN: map, size, stare słowo, nowe słowo (równej długości) | OUT: int (ile zmian)",
+    code: `int replace_same_len_in_mmap(char *map, size_t size, const char *old_w, const char *new_w) {
+    char *safe = malloc(size + 1);
+    if (!safe) ERR("malloc");
+    memcpy(safe, map, size);
+    safe[size] = '\\0';
+
+    size_t wlen = strlen(old_w);
+    int count = 0;
+    char *pos = safe;
+    while ((pos = strstr(pos, old_w)) != NULL) {
+        memcpy(map + (pos - safe), new_w, wlen);
+        count++;
+        pos += wlen;
+    }
+    free(safe);
+    return count;
+}`
+  },
+  {
+    title: "map_struct_array(const char *path, size_t count, int *out_fd)",
+    sub: "Tworzy/rozszerza plik przez ftruncate() i mapuje jako tablicę struktur",
+    category: "Pamięć (mmap)",
+    desc: "Wzorzec dla plików binarnych: nadaje plikowi dokładny rozmiar count * sizeof(Entry) i zwraca wskaźnik Entry*, po którym chodzisz jak po zwykłej tablicy arr[i].",
+    io: "IN: ścieżka, liczba elementów, &fd | OUT: Entry* (zmapowana tablica)",
+    code: `typedef struct {
+    int id;
+    double value;
+    char name[32];
+} Entry;
+
+Entry *map_struct_array(const char *path, size_t count, int *out_fd) {
+    size_t total = count * sizeof(Entry);
+    int fd = open(path, O_RDWR | O_CREAT, 0666);
+    if (fd == -1) ERR("open struct file");
+    if (ftruncate(fd, (off_t)total) == -1) ERR("ftruncate");
+
+    Entry *arr = mmap(NULL, total, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (arr == MAP_FAILED) ERR("mmap structs");
+    *out_fd = fd;
+    return arr;
+}`
+  },
+  {
+    title: "sort_mapped_structs(Entry *arr, size_t count)",
+    sub: "Sortuje w miejscu rekordy w pliku zmapowanym przez mmap() używając qsort()",
+    category: "Pamięć (mmap)",
+    desc: "Ponieważ arr wskazuje bezpośrednio na strony pliku w pamięci, qsort() sortuje plik na dysku w miejscu. Na końcu zrzuca zmiany przez msync().",
+    io: "IN: wskaźnik Entry*, liczba rekordów | OUT: void (plik posortowany)",
+    code: `int cmp_entries(const void *a, const void *b) {
+    const Entry *ea = (const Entry *)a;
+    const Entry *eb = (const Entry *)b;
+    return (ea->id > eb->id) - (ea->id < eb->id); // rosnąco po id bez overflow
+}
+
+void sort_mapped_structs(Entry *arr, size_t count) {
+    qsort(arr, count, sizeof(Entry), cmp_entries);
+    if (msync(arr, count * sizeof(Entry), MS_SYNC) == -1)
+        ERR("msync");
+}`
+  }
+];
+
+// 2. PEŁNE SZABLONY PROGRAMÓW (5 scenariuszy egzaminacyjnych)
+const TEMPLATES = [
+  {
+    title: "Szablon 1: Baza startowa każdego programu SOP (main + nagłówki + TEMP_FAILURE_RETRY)",
+    sub: "Kopiuj na start laboratorium (pierwsze 2 minuty)",
+    category: "Start & Narzędzia",
+    desc: "Kompletny szkielet z wszystkimi wymaganymi nagłówkami, makrem ERR, obsługą EINTR oraz szkieletem main(argc, argv).",
+    points: [
+      "Kompilacja: gcc -std=c17 -Wall -Wextra -pedantic -g -fsanitize=address,undefined prog.c -o prog",
+      "TEMP_FAILURE_RETRY automatycznie ponawia wywołania przerwane sygnałem (errno == EINTR)",
+      "Gotowy punkt startowy pod doklejenie wybranych klocków z Zakładki 1"
+    ],
+    code: `#define _POSIX_C_SOURCE 200809L
+
+#include <ctype.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <poll.h>
+#include <signal.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/uio.h>
+#include <unistd.h>
+
+#define ERR(source) (perror(source), fprintf(stderr, "%s:%d\\n", __FILE__, __LINE__), exit(EXIT_FAILURE))
+
+#ifndef TEMP_FAILURE_RETRY
+#define TEMP_FAILURE_RETRY(expression) \\
+    (__extension__({                   \\
+        long int __result;             \\
+        do                             \\
+            __result = (long int)(expression); \\
+        while (__result == -1L && errno == EINTR); \\
+        __result;                      \\
+    }))
+#endif
+
+void usage(const char *pname) {
+    fprintf(stderr, "USAGE: %s <arg1> <arg2>\\n", pname);
+    exit(EXIT_FAILURE);
+}
+
+int main(int argc, char *argv[]) {
+    if (argc < 2) usage(argv[0]);
+    return EXIT_SUCCESS;
+}`
+  },
+  {
+    title: "Szablon 2: Serwer wielu FIFO (klienci łączą się w dowolnym momencie, np. echo > fi1)",
+    sub: "mkfifo + open(O_RDWR | O_NONBLOCK) + poll() + unlink()",
+    category: "FIFO & Poll",
+    desc: "Pełna pętla serwera tworzącego FIFO i czekającego na wielu pisarzy podłączających się dynamicznie. Użycie O_RDWR zapobiega natychmiastowemu POLLHUP, gdy w danej chwili żaden klient nie pisze.",
+    points: [
+      "mkfifo() tylko tworzy plik — deskryptor pobiera dopiero open()",
+      "O_RDWR | O_NONBLOCK sprawia, że proces sam dla siebie trzyma koniec do zapisu i poll() nie dostaje fałszywego POLLHUP",
+      "Zawsze ustawiaj buf[r] = '\\0' przed printf(\"%s\", buf) oraz sprzątaj unlink()"
+    ],
+    code: `#define MAX_FIFOS 5
+#define BUF_SIZE 256
+
+void run_fifo_server(int n, const char *names[]) {
+    struct pollfd fds[MAX_FIFOS];
+
+    for (int i = 0; i < n; i++) {
+        if (mkfifo(names[i], 0666) == -1 && errno != EEXIST)
+            ERR("mkfifo");
+
+        fds[i].fd = open(names[i], O_RDWR | O_NONBLOCK);
+        if (fds[i].fd == -1)
+            ERR("open fifo");
+
+        fds[i].events = POLLIN;
+        fds[i].revents = 0;
+    }
+
+    char buf[BUF_SIZE];
+    int active = n;
+
+    while (active > 0) {
+        int ready = poll(fds, (nfds_t)n, 3000);
+        if (ready < 0) {
+            if (errno == EINTR) continue;
+            ERR("poll");
+        }
+        if (ready == 0) {
+            printf("Timeout 3s — brak wiadomości na żadnym FIFO...\\n");
+            continue;
+        }
+
+        for (int i = 0; i < n; i++) {
+            if (fds[i].fd == -1 || fds[i].revents == 0)
+                continue;
+
+            if (fds[i].revents & POLLIN) {
+                while (1) {
+                    ssize_t r = read(fds[i].fd, buf, sizeof(buf) - 1);
+                    if (r > 0) {
+                        buf[r] = '\\0';
+                        printf("[%s]: %s", names[i], buf);
+                        fflush(stdout);
+                    } else if (r == 0) {
+                        break;
+                    } else {
+                        if (errno == EAGAIN || errno == EWOULDBLOCK) break;
+                        if (errno == EINTR) continue;
+                        ERR("read");
+                    }
+                }
+            }
+
+            if (fds[i].revents & (POLLERR | POLLNVAL)) {
+                close(fds[i].fd);
+                fds[i].fd = -1;
+                active--;
+            }
+        }
+    }
+
+    for (int i = 0; i < n; i++) {
+        if (fds[i].fd != -1) close(fds[i].fd);
+        unlink(names[i]);
+    }
+}`
+  },
+  {
+    title: "Szablon 3: Odbiornik z wielu FIFO + składanie pociętych linii (wzorzec sop-cake)",
+    sub: "stat(S_ISFIFO) + open(O_RDONLY | O_NONBLOCK) + poll() + memchr/memmove",
+    category: "FIFO & Poll",
+    desc: "Pełna pętla odbiornika, gdy procesy piszące (np. granny.sh) już czekają na FIFO, wysyłają linie zakończone '\\n' w losowych kawałkach i kończą pracę przez EOF / POLLHUP.",
+    points: [
+      "Każde FIFO ma własny bufor bufs[i] oraz własny licznik lens[i]",
+      "ZAWSZE opróżniaj POLLIN w pętli aż do EAGAIN/EOF ZANIM zamkniesz fd przez POLLHUP",
+      "Po close(fds[i].fd) ustaw fds[i].fd = -1, aby poll() ignorował ten slot"
+    ],
+    code: `#define MAX_SOURCES 5
+#define BUF_SIZE 256
+
+void handle_line(int out_fd, const char *line); // Twoja funkcja obrabiająca jedną linię bez '\\n'
+
+void listen_all_sources(int out_fd, int n, char *paths[]) {
+    struct pollfd fds[MAX_SOURCES];
+    char bufs[MAX_SOURCES][BUF_SIZE];
+    size_t lens[MAX_SOURCES] = {0};
+
+    for (int i = 0; i < n; i++) {
+        struct stat st;
+        if (stat(paths[i], &st) == -1 || !S_ISFIFO(st.st_mode)) {
+            fprintf(stderr, "Brak FIFO: %s\\n", paths[i]);
+            for (int j = 0; j < i; j++) close(fds[j].fd);
+            exit(EXIT_FAILURE);
+        }
+
+        fds[i].fd = open(paths[i], O_RDONLY | O_NONBLOCK);
+        if (fds[i].fd == -1) {
+            for (int j = 0; j < i; j++) close(fds[j].fd);
+            ERR("open");
+        }
+        fds[i].events = POLLIN;
+        fds[i].revents = 0;
+    }
+
+    int active = n;
+    while (active > 0) {
+        int ready = poll(fds, (nfds_t)n, 3000);
+        if (ready < 0) {
+            if (errno == EINTR) continue;
+            ERR("poll");
+        }
+        if (ready == 0) {
+            printf("Oczekiwanie (timeout 3s)...\\n");
+            continue;
+        }
+
+        for (int i = 0; i < n; i++) {
+            if (fds[i].fd == -1 || fds[i].revents == 0)
+                continue;
+
+            bool eof = false;
+
+            if (fds[i].revents & POLLIN) {
+                while (1) {
+                    ssize_t r = read(fds[i].fd, bufs[i] + lens[i], BUF_SIZE - 1 - lens[i]);
+                    if (r > 0) {
+                        lens[i] += (size_t)r;
+                        bufs[i][lens[i]] = '\\0';
+
+                        char *nl;
+                        while ((nl = memchr(bufs[i], '\\n', lens[i])) != NULL) {
+                            *nl = '\\0';
+                            handle_line(out_fd, bufs[i]);
+
+                            size_t used = (size_t)(nl - bufs[i]) + 1;
+                            lens[i] -= used;
+                            memmove(bufs[i], nl + 1, lens[i]);
+                            bufs[i][lens[i]] = '\\0';
+                        }
+                    } else if (r == 0) {
+                        eof = true;
+                        break;
+                    } else {
+                        if (errno == EAGAIN || errno == EWOULDBLOCK) break;
+                        if (errno == EINTR) continue;
+                        ERR("read");
+                    }
+                }
+            }
+
+            if (eof || (fds[i].revents & (POLLHUP | POLLERR | POLLNVAL))) {
+                if (close(fds[i].fd) == -1) ERR("close");
+                fds[i].fd = -1;
+                active--;
+            }
+        }
+    }
+}`
+  },
+  {
+    title: "Szablon 4: Nadajnik dużej paczki przez POLLOUT (zapis na raty do pełnego bufora)",
+    sub: "signal(SIGPIPE, SIG_IGN) + open(O_WRONLY | O_NONBLOCK) + poll(POLLOUT)",
+    category: "FIFO & Poll",
+    desc: "Kompletny program wysyłający paczkę większą niż bufor jądra (64 KB) bez blokowania procesu. Demonstruje poprawne włączanie i zdejmowanie maski POLLOUT.",
+    points: [
+      "Ignoruj SIGPIPE, aby zamknięcie czytelnika zwróciło EPIPE zamiast ubić proces",
+      "open(..., O_WRONLY | O_NONBLOCK) zwraca ENXIO jeśli żaden czytelnik jeszcze nie otworzył FIFO",
+      "Po wysłaniu wszystkich bajtów zdejmij flagę: fds[0].events &= ~POLLOUT"
+    ],
+    code: `void send_large_buffer_pollout(const char *fifo_path, const char *data, size_t total_len) {
+    signal(SIGPIPE, SIG_IGN);
+
+    int fd = open(fifo_path, O_WRONLY | O_NONBLOCK);
+    if (fd == -1) {
+        if (errno == ENXIO)
+            fprintf(stderr, "Brak czytelnika na FIFO %s\\n", fifo_path);
+        ERR("open fifo write");
+    }
+
+    size_t sent = 0;
+    struct pollfd fds[1] = {{ .fd = fd, .events = POLLOUT, .revents = 0 }};
+
+    while (sent < total_len) {
+        int ready = poll(fds, 1, 3000);
+        if (ready < 0) {
+            if (errno == EINTR) continue;
+            ERR("poll");
+        }
+        if (ready == 0) {
+            printf("Odbiorca nie opróżnia bufora (timeout 3s)...\\n");
+            continue;
+        }
+        if (fds[0].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+            fprintf(stderr, "Odbiorca zamknął FIFO przed odebraniem całości!\\n");
+            break;
+        }
+        if (fds[0].revents & POLLOUT) {
+            ssize_t w = write(fd, data + sent, total_len - sent);
+            if (w > 0) {
+                sent += (size_t)w;
+                if (sent == total_len)
+                    fds[0].events &= ~POLLOUT;
+            } else if (w == -1 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
+                ERR("write");
+            }
+        }
+    }
+    close(fd);
+}`
+  },
+  {
+    title: "Szablon 5: Etap końcowy mmap() — czyszczenie słów i wypisywanie linii bez spacji",
+    sub: "mmap(PROT_READ | PROT_WRITE, MAP_SHARED) + strstr + msync + munmap",
+    category: "Pamięć (mmap)",
+    desc: "Kompletny etap finalizacji pliku o stałej strukturze wierszy (np. 32 x 64 B): bezpieczna podmiana podciągów, synchronizacja na dysk oraz wydruk niepustych wierszy.",
+    points: [
+      "Kopia safe[file_size + 1] z '\\0' na końcu chroni strstr przed wyjściem poza zmapowaną stronę",
+      "printf(\"%02d: %.*s\\n\", i, end, line) przycina spacje dopełniające z prawej strony",
+      "Na końcu obowiązkowe msync(..., MS_SYNC) oraz munmap()"
+    ],
+    code: `void clean_and_print_mapped(int fd, size_t file_size) {
+    char *map = mmap(NULL, file_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (map == MAP_FAILED) ERR("mmap");
+
+    char *safe = malloc(file_size + 1);
+    if (!safe) ERR("malloc");
+    memcpy(safe, map, file_size);
+    safe[file_size] = '\\0';
+
+    int replaced = 0;
+    char *pos = safe;
+    while ((pos = strstr(pos, "raw~berries")) != NULL) {
+        size_t off = (size_t)(pos - safe);
+        memcpy(map + off, "raspberries", 11);
+        replaced++;
+        pos += 11;
+    }
+    free(safe);
+
+    if (msync(map, file_size, MS_SYNC) == -1) ERR("msync");
+    printf("Wyczyszczono wystąpień: %d\\n", replaced);
+
+    for (int i = 0; i < 32; i++) {
+        const char *line = map + (i * 64);
+        int end = 63;
+        while (end > 0 && line[end - 1] == ' ') end--;
+        if (end > 0)
+            printf("%02d: %.*s\\n", i, end, line);
+    }
+
+    if (munmap(map, file_size) == -1) ERR("munmap");
+}`
+  }
+];
+
+// 3. PEŁNA DOKUMENTACJA FUNKCJI I FLAG (11 kart bez duplikatów)
+const FUNCTIONS = [
+  {
+    title: "open() & close()",
+    sub: "#include <fcntl.h> / #include <unistd.h>",
+    category: "Deskryptory & I/O",
+    sig: "int open(const char *path, int flags, ... /* mode_t mode */);\nint close(int fd);",
+    desc: "Otwiera lub tworzy plik/FIFO i zwraca niski deskryptor pliku (int). Trzeci argument (mode, np. 0666 lub 0644) jest OBOWIĄZKOWY zawsze, gdy w flags używasz O_CREAT.",
+    returns: "Deskryptor >= 0 w przypadku sukcesu, -1 przy błędzie (ustawia errno).",
+    pitfalls: "Sprawdzaj errno == ENOENT (brak pliku) lub EEXIST (plik już istnieje przy O_CREAT | O_EXCL). Dla FIFO zwykłe open(path, O_RDONLY) blokuje proces, dopóki ktoś nie otworzy tego FIFO do zapisu!",
+    flags: [
+      ["O_RDONLY / O_WRONLY / O_RDWR", "Tryb bazowy (wybierz dokładnie jeden). Do mmap z zapisem zawsze otwieraj z O_RDWR!"],
+      ["O_CREAT", "Tworzy plik, jeśli nie istnieje (wymaga 3. argumentu mode, np. 0666)."],
+      ["O_EXCL", "Razem z O_CREAT: gwarantuje atomowo, że plik nie istniał (zwraca -1 i EEXIST)."],
+      ["O_TRUNC", "Zeruje długość istniejącego pliku do 0 bajtów przy otwieraniu."],
+      ["O_APPEND", "Każdy write() atomowo dopisuje dane na sam koniec pliku."],
+      ["O_NONBLOCK", "Nie blokuje ani podczas open() (dla FIFO), ani podczas późniejszych read()/write()."]
+    ],
+    code: `int fd = open(path, O_RDWR);
+if (fd == -1) {
+    if (errno != ENOENT) ERR("open");
+    fd = open(path, O_RDWR | O_CREAT, 0666);
+    if (fd == -1) ERR("open create");
+}`
+  },
+  {
+    title: "read() & write()",
+    sub: "#include <unistd.h>",
+    category: "Deskryptory & I/O",
+    sig: "ssize_t read(int fd, void *buf, size_t count);\nssize_t write(int fd, const void *buf, size_t count);",
+    desc: "Niskopoziomowy odczyt i zapis bajtów. UWAGA: read() NIE dopisuje znaku '\\0' na końcu bufora! Pojedyncze wywołanie może przeczytać lub zapisać mniej bajtów niż count.",
+    returns: "Liczba przetworzonych bajtów (ssize_t > 0), 0 oznacza EOF (dla read: wszyscy pisarze zamknęli FIFO/pipe), -1 oznacza błąd.",
+    pitfalls: "NIGDY nie przypisuj wyniku do size_t (bo -1 zmieni się w gigantyczną liczbę i wywali segfault przy buf[r] = '\\0'). Zawsze rezerwuj sizeof(buf) - 1 na odczyt tekstu.",
+    flags: [
+      ["r > 0", "Przeczytano r bajtów. Jeśli traktujesz buf jako string: buf[r] = '\\0'."],
+      ["r == 0", "Koniec pliku (EOF) — na FIFO oznacza, że wszyscy pisarze zamknęli deskryptory."],
+      ["r == -1 && errno == EINTR", "Wywołanie przerwane sygnałem — powtórz w pętli (continue)."],
+      ["r == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)", "W trybie O_NONBLOCK: brak danych w tej chwili (bufor opróżniony) lub brak miejsca przy write()."],
+      ["r == -1 && errno == EPIPE", "Przy write() do FIFO/pipe, gdy nikt nie słucha (proces dostaje też SIGPIPE)."]
+    ],
+    code: `ssize_t r = read(fd, buf, sizeof(buf) - 1);
+if (r > 0) buf[r] = '\\0';`
+  },
+  {
+    title: "lseek()",
+    sub: "#include <unistd.h>",
+    category: "Pliki & Rekordy",
+    sig: "off_t lseek(int fd, off_t offset, int whence);",
+    desc: "Przestawia kursor (offset) otwartego pliku dyskowego i zwraca nową pozycję od początku pliku. Pozwala też błyskawicznie sprawdzić rozmiar pliku oraz pisać w konkretnym rekordzie/wierszu.",
+    returns: "Nowy offset od początku pliku (off_t >= 0), lub (off_t)-1 w przypadku błędu.",
+    pitfalls: "NIE działa na łączach FIFO, pipe'ach ani gniazdach sieciowych (zwraca -1 i errno == ESPIPE)! Typ zwracany to off_t (ze znakiem).",
+    flags: [
+      ["SEEK_SET", "Ustawia kursor dokładnie na bajt 'offset' licząc od początku pliku (np. step * 64)."],
+      ["SEEK_CUR", "Przesuwa kursor o 'offset' bajtów względem aktualnej pozycji (offset może być ujemny)."],
+      ["SEEK_END", "Ustawia kursor na koniec pliku + 'offset'. lseek(fd, 0, SEEK_END) zwraca rozmiar pliku w bajtach!"]
+    ],
+    code: `off_t size = lseek(fd, 0, SEEK_END);
+if (size == -1) ERR("lseek");
+if (lseek(fd, (off_t)step * 64, SEEK_SET) == -1) ERR("lseek step");`
+  },
+  {
+    title: "readv() & writev() (Scatter / Gather I/O)",
+    sub: "#include <sys/uio.h>",
+    category: "Deskryptory & I/O",
+    sig: "ssize_t readv(int fd, const struct iovec *iov, int iovcnt);\nssize_t writev(int fd, const struct iovec *iov, int iovcnt);",
+    desc: "Atomowo czyta do wielu buforów lub zapisuje wiele rozproszonych buforów jednym wywołaniem systemowym (bez sklejania ich wcześniej przez memcpy).",
+    returns: "Łączna liczba przeczytanych/zapisanych bajtów (ssize_t) ze wszystkich wektorów, 0 (EOF), lub -1.",
+    pitfalls: "Struktura struct iovec ma pola: void *iov_base (adres bufora) oraz size_t iov_len (długość w bajtach).",
+    flags: [
+      ["iov[i].iov_base", "Wskaźnik na i-ty bufor w pamięci."],
+      ["iov[i].iov_len", "Liczba bajtów do odczytu/zapisu z i-tego bufora."]
+    ],
+    code: `struct iovec iov[2] = {{hdr, strlen(hdr)}, {body, strlen(body)}};
+ssize_t w = writev(fd, iov, 2);`
+  },
+  {
+    title: "fcntl() & Tryb nieblokujący (O_NONBLOCK)",
+    sub: "#include <fcntl.h> / #include <unistd.h>",
+    category: "FIFO & Poll",
+    sig: "int fcntl(int fd, int cmd, ... /* arg */);",
+    desc: "Modyfikuje właściwości już otwartego deskryptora (np. włącza/wyłącza O_NONBLOCK na STDIN_FILENO lub otwartym łączu). Zawsze działa w 2 krokach: F_GETFL -> modyfikacja -> F_SETFL.",
+    returns: "Dla F_GETFL: aktualna maska flag (>=0). Dla F_SETFL: 0 przy sukcesie. W razie błędu: -1.",
+    pitfalls: "NIGDY nie wywołuj fcntl(fd, F_SETFL, O_NONBLOCK) bez wcześniejszego F_GETFL, bo wyzerujesz pozostałe flagi deskryptora!",
+    flags: [
+      ["F_GETFL", "Pobiera aktualne flagi statusu deskryptora fd."],
+      ["F_SETFL", "Ustawia nowe flagi statusu deskryptora (np. flags | O_NONBLOCK)."],
+      ["flags | O_NONBLOCK", "Włącza tryb nieblokujący."],
+      ["flags & ~O_NONBLOCK", "Wyłącza tryb nieblokujący (wraca do trybu blokującego)."]
+    ],
+    code: `int flags = fcntl(fd, F_GETFL, 0);
+if (flags == -1) ERR("fcntl F_GETFL");
+if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) ERR("fcntl F_SETFL");`
+  },
+  {
+    title: "poll() — Kompendium Multipleksowania",
+    sub: "#include <poll.h>",
+    category: "FIFO & Poll",
+    sig: "int poll(struct pollfd *fds, nfds_t nfds, int timeout);",
+    desc: "Czeka jednocześnie na zdarzenia na wielu deskryptorach (FIFO, pipe, STDIN, sockety) bez aktywnego czekania. Wpis z fds[i].fd < 0 jest ignorowany przez jądro.",
+    returns: "> 0: liczba gotowych fd (revents != 0), 0: minął timeout (ms), -1: błąd (sprawdź EINTR).",
+    pitfalls: "1) ZAWSZE opróżniaj POLLIN w pętli aż do EAGAIN/EOF przed zamknięciem fd przez POLLHUP.\n2) Przy POLLOUT zdejmuj flagę (events &= ~POLLOUT) gdy kolejka wyjściowa jest pusta!",
+    flags: [
+      ["POLLIN", "(events i revents) Są dane do odczytu — wywołaj read()."],
+      ["POLLOUT", "(events i revents) Można pisać bez blokowania — wywołaj write()."],
+      ["POLLHUP", "(tylko revents!) Druga strona zamknęła łącze (Hang Up). W buforze nadal mogą czekać ostatnie bajty (POLLIN)!"],
+      ["POLLERR / POLLNVAL", "(tylko revents!) Błąd strumienia lub nieprawidłowy (zamknięty) deskryptor."],
+      ["timeout = -1 / 0 / >0", "-1: czekaj bez końca | 0: sprawdź bez blokowania | >0: maksymalny czas w ms."]
+    ],
+    code: `int ready = poll(fds, (nfds_t)n, 3000);
+if (ready < 0 && errno == EINTR) continue;
+if (ready == 0) { /* timeout */ }`
+  },
+  {
+    title: "mkfifo(), stat() / fstat() & S_ISFIFO",
+    sub: "#include <sys/stat.h> / #include <unistd.h>",
+    category: "FIFO & Poll",
+    sig: "int mkfifo(const char *pathname, mode_t mode);\nint stat(const char *pathname, struct stat *statbuf);\nint fstat(int fd, struct stat *statbuf);",
+    desc: "mkfifo tworzy w systemie plików łącze nazwane (FIFO). stat/fstat pobiera metadane pliku i pozwala sprawdzić makrem S_ISFIFO(st.st_mode), czy ścieżka jest łączem nazwanym.",
+    returns: "0 przy sukcesie, -1 przy błędzie (np. stat zwraca -1 z ENOENT gdy plik nie istnieje).",
+    pitfalls: "mkfifo zwraca 0 (sukces), NIGDY deskryptor pliku! Dla FIFO st.st_size wynosi zawsze 0. Zapis do FIFO do PIPE_BUF (4096 B) jest atomowy.",
+    flags: [
+      ["S_ISFIFO(st.st_mode)", "Prawda, jeśli plik jest łączem nazwanym (FIFO) lub pipe'em."],
+      ["S_ISREG(st.st_mode)", "Prawda, jeśli to zwykły plik dyskowy."],
+      ["S_ISDIR(st.st_mode)", "Prawda, jeśli to katalog."],
+      ["unlink(pathname)", "Usuwa plik lub łącze FIFO z systemu plików."]
+    ],
+    code: `struct stat st;
+if (stat(path, &st) == -1 || !S_ISFIFO(st.st_mode)) exit(EXIT_FAILURE);`
+  },
+  {
+    title: "mmap(), ftruncate(), msync() & munmap()",
+    sub: "#include <sys/mman.h> / #include <unistd.h>",
+    category: "Pamięć (mmap)",
+    sig: "void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);\nint ftruncate(int fd, off_t length);\nint msync(void *addr, size_t length, int flags);\nint munmap(void *addr, size_t length);",
+    desc: "Mapuje zawartość otwartego pliku (fd) bezpośrednio do przestrzeni adresowej procesu jako tablicę bajtów lub struktur.",
+    returns: "mmap zwraca wskaźnik lub MAP_FAILED ((void*)-1 — NIGDY nie sprawdzaj == NULL!). Pozostałe zwracają 0 lub -1.",
+    pitfalls: "1) Aby użyć PROT_WRITE z MAP_SHARED, plik MUSI być otwarty z O_RDWR.\n2) mmap NIE mapuje pustego pliku 0 B (zwróci EINVAL) — rozszerz go wcześniej przez ftruncate lub write!",
+    flags: [
+      ["PROT_READ | PROT_WRITE", "Pozwala czytać i modyfikować zmapowaną pamięć."],
+      ["MAP_SHARED", "Zmiany w pamięci trafiają z powrotem do pliku na dysku."],
+      ["MAP_PRIVATE", "Copy-on-write: zmiany są prywatne dla procesu i nie zmieniają pliku."],
+      ["MS_SYNC", "Flaga dla msync(): blokuje aż zmiany zostaną fizycznie zapisane na dysk."]
+    ],
+    code: `ftruncate(fd, size);
+char *map = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+if (map == MAP_FAILED) ERR("mmap");`
+  },
+  {
+    title: "memchr(), memmove(), memcpy() & memset()",
+    sub: "#include <string.h>",
+    category: "Stringi & Bufory",
+    sig: "void *memchr(const void *s, int c, size_t n);\nvoid *memmove(void *dest, const void *src, size_t n);\nvoid *memcpy(void *dest, const void *src, size_t n);\nvoid *memset(void *s, int c, size_t n);",
+    desc: "Operacje na surowych blokach pamięci o jawnej długości n (ignorują znak '\\0'). Niezbędne przy cięciu strumienia po '\\n' i wypełnianiu rekordów.",
+    returns: "memchr zwraca wskaźnik na znaleziony bajt lub NULL jeśli nie ma go w pierwszych n bajtach.",
+    pitfalls: "Gdy przesuwasz dane wewnątrz TEGO SAMEGO bufora (np. ogon za '\\n' na początek tablicy buf), ZAWSZE używaj memmove(), a NIE memcpy() (Undefined Behavior).",
+    flags: [
+      ["memchr(buf, '\\n', len)", "Bezpiecznie szuka '\\n' na dokładnie 'len' bajtach (nie wymaga '\\0')."],
+      ["memmove(buf, nl + 1, len)", "Bezpiecznie przesuwa niedokończony początek kolejnej wiadomości na indeks 0."],
+      ["memset(line, ' ', 63)", "Wypełnia bufor spacjami przed wklejeniem tekstu przez memcpy."]
+    ],
+    code: `char *nl = memchr(buf, '\\n', len);
+if (nl) { *nl = '\\0'; /* przetwórz buf */ }`
+  },
+  {
+    title: "strchr(), strstr(), strtol() & isdigit()",
+    sub: "#include <string.h> / #include <stdlib.h> / #include <ctype.h>",
+    category: "Stringi & Bufory",
+    sig: "char *strchr(const char *s, int c);\nchar *strstr(const char *haystack, const char *needle);\nlong strtol(const char *nptr, char **endptr, int base);\nint isdigit(int c);",
+    desc: "Funkcje do rozbijania protokołów tekstowych (np. 'NN:treść'), walidacji liczb przed dwukropkiem oraz wyszukiwania podciągów.",
+    returns: "strchr/strstr zwracają wskaźnik na znaleziony znak/podciąg lub NULL. strtol zwraca liczbę long i wpisuje w *endptr adres pierwszego znaku po liczbie.",
+    pitfalls: "1) strchr i strstr WYMAGAJĄ napisu zakończonego '\\0'!\n2) Do wypisania dokładnie 'end' znaków bez '\\0' używaj printf(\"%.*s\\n\", end, line).",
+    flags: [
+      ["strchr(msg, ':')", "Znajduje pierwszy dwukropek w wiadomości (treść jest pod colon + 1)."],
+      ["isdigit((unsigned char)*p)", "Sprawdza czy znak jest cyfrą '0'..'9' (zawsze rzutuj na unsigned char)."],
+      ["strtol(msg, &endptr, 10)", "Konwertuje napis na liczbę; jeśli endptr == colon, całość przed ':' była liczbą."],
+      ["strstr(pos, \"raw~berries\")", "Znajduje pierwsze wystąpienie podciągu; w pętli przesuwaj pos += strlen(word)."],
+      ["printf(\"%02ld: %.*s\\n\", nr, len, ptr)", "%02ld wypisuje liczbę z zerem wiodącym (07), a %.*s wypisuje dokładnie 'len' znaków."]
+    ],
+    code: `char *endptr;
+long step = strtol(msg, &endptr, 10);
+if (endptr != colon || step < 0 || step > 31) return;`
+  },
+  {
+    title: "dup2(), pipe() & TEMP_FAILURE_RETRY",
+    sub: "#include <unistd.h> / #define _GNU_SOURCE",
+    category: "Deskryptory & I/O",
+    sig: "int dup2(int oldfd, int newfd);\nint pipe(int pipefd[2]);",
+    desc: "Przekierowanie standardowego wyjścia/wejścia, tworzenie łączy nienazwanych oraz automatyczne ponawianie wywołań przerwanych przez sygnał (EINTR).",
+    returns: "dup2 zwraca nowy deskryptor (>=0), pipe zwraca 0, przy błędzie -1.",
+    pitfalls: "W pipe(pfd): pfd[0] służy wyłącznie do odczytu (read), a pfd[1] wyłącznie do zapisu (write). Nieużywany koniec zawsze zamykaj przez close().",
+    flags: [
+      ["dup2(fd, STDOUT_FILENO)", "Przekierowuje stdout (1) do pliku/łącza fd (printf będzie pisał do fd)."],
+      ["pipe(pfd)", "Tworzy łącze nienazwane: pfd[0] (read), pfd[1] (write)."],
+      ["TEMP_FAILURE_RETRY(exp)", "Makro ponawiające wywołanie systemowe, dopóki zwraca -1 z errno == EINTR."]
+    ],
+    code: `int pfd[2];
+if (pipe(pfd) == -1) ERR("pipe");
+// dup2(pfd[1], STDOUT_FILENO);`
+  }
+];
+
+const grid = document.getElementById("cards-grid");
+const searchInput = document.getElementById("search");
+const filtersContainer = document.getElementById("filters");
+const countBadge = document.getElementById("count-badge");
+const tabBtns = document.querySelectorAll(".tab-btn");
+
+let activeTab = "blocks";
+let activeCategory = "Wszystkie";
+
+function getDataset() {
+  if (activeTab === "blocks") return BLOCKS;
+  if (activeTab === "templates") return TEMPLATES;
+  return FUNCTIONS;
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function renderFilters() {
+  const data = getDataset();
+  const cats = ["Wszystkie", ...new Set(data.map(item => item.category))];
+  if (!cats.includes(activeCategory)) activeCategory = "Wszystkie";
+
+  filtersContainer.innerHTML = cats.map(cat => `
+    <button class="filter-btn ${cat === activeCategory ? "active" : ""}" data-cat="${cat}">${cat}</button>
+  `).join("");
+
+  filtersContainer.querySelectorAll(".filter-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      activeCategory = btn.dataset.cat;
+      renderFilters();
+      renderCards();
+    });
+  });
+}
+
+function renderCards() {
+  const data = getDataset();
+  const q = searchInput.value.trim().toLowerCase();
+
+  grid.className = activeTab === "templates" ? "grid wide-view" : "grid";
+
+  const filtered = data.filter(item => {
+    const matchCat = activeCategory === "Wszystkie" || item.category === activeCategory;
+    const text = JSON.stringify(item).toLowerCase();
+    return matchCat && (!q || text.includes(q));
+  });
+
+  const label = activeTab === "blocks" ? "klocków" : (activeTab === "templates" ? "szablonów" : "funkcji");
+  countBadge.textContent = `${filtered.length} / ${data.length} ${label}`;
+
+  if (activeTab === "blocks") {
+    grid.innerHTML = filtered.map((b, idx) => `
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">${escapeHtml(b.title)}</div>
+            <div class="card-sub">${escapeHtml(b.sub)}</div>
+          </div>
+          <span class="cat-tag">${escapeHtml(b.category)}</span>
+        </div>
+        <div class="card-body">
+          <p class="desc">${escapeHtml(b.desc)}</p>
+          <div class="io-hint">${escapeHtml(b.io)}</div>
+          <div class="code-wrap">
+            <button class="copy-btn" data-idx="${idx}">Kopiuj funkcję</button>
+            <pre><code>${escapeHtml(b.code)}</code></pre>
+          </div>
+        </div>
+      </article>
+    `).join("");
+  } else if (activeTab === "templates") {
+    grid.innerHTML = filtered.map((t, idx) => `
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">${escapeHtml(t.title)}</div>
+            <div class="card-sub">${escapeHtml(t.sub)}</div>
+          </div>
+          <span class="cat-tag tpl">${escapeHtml(t.category)}</span>
+        </div>
+        <div class="card-body">
+          <p class="desc">${escapeHtml(t.desc)}</p>
+          <ul class="checklist">
+            ${t.points.map(p => `<li>${escapeHtml(p)}</li>`).join("")}
+          </ul>
+          <div class="code-wrap">
+            <button class="copy-btn" data-idx="${idx}">Kopiuj szablon</button>
+            <pre><code>${escapeHtml(t.code)}</code></pre>
+          </div>
+        </div>
+      </article>
+    `).join("");
+  } else {
+    grid.innerHTML = filtered.map((c, idx) => `
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">${escapeHtml(c.title)}</div>
+            <div class="card-sub">${escapeHtml(c.sub)}</div>
+          </div>
+          <span class="cat-tag ref">${escapeHtml(c.category)}</span>
+        </div>
+        <div class="card-body">
+          <div class="sig">${escapeHtml(c.sig).replace(/\n/g, "<br>")}</div>
+          <p class="desc">${escapeHtml(c.desc)}</p>
+          <div class="meta-box">
+            <div><strong>Zwraca:</strong> ${escapeHtml(c.returns)}</div>
+            <div class="warn"><strong>Pułapki:</strong> ${escapeHtml(c.pitfalls)}</div>
+          </div>
+          <table class="flags-table">
+            <thead><tr><th style="width:36%">Flaga / Wzorzec</th><th>Znaczenie i kiedy używać</th></tr></thead>
+            <tbody>
+              ${c.flags.map(f => `<tr><td><code>${escapeHtml(f[0])}</code></td><td>${escapeHtml(f[1])}</td></tr>`).join("")}
+            </tbody>
+          </table>
+          <div class="code-wrap">
+            <button class="copy-btn" data-idx="${idx}">Kopiuj przykład</button>
+            <pre><code>${escapeHtml(c.code)}</code></pre>
+          </div>
+        </div>
+      </article>
+    `).join("");
+  }
+
+  grid.querySelectorAll(".copy-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const code = filtered[btn.dataset.idx].code;
+      navigator.clipboard.writeText(code);
+      const prev = btn.textContent;
+      btn.textContent = "Skopiowano!";
+      setTimeout(() => (btn.textContent = prev), 1200);
+    });
+  });
+}
+
+tabBtns.forEach(btn => {
+  btn.addEventListener("click", () => {
+    tabBtns.forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    activeTab = btn.dataset.tab;
+    activeCategory = "Wszystkie";
+    renderFilters();
+    renderCards();
+  });
+});
+
+searchInput.addEventListener("input", renderCards);
+window.addEventListener("keydown", e => {
+  if (e.key === "/" && document.activeElement !== searchInput) {
+    e.preventDefault();
+    searchInput.focus();
+  }
+});
+
+renderFilters();
+renderCards();
+</script>
+</body>
+</html>
