@@ -1,0 +1,19 @@
+Poza oczywistym read() na FIFO istnieje 6 nieoczywistych pułapek, które potrafią zawiesić program albo wpuścić go w nieskończoną pętlę mimo używania poll():
+1. Samo open() na FIFO blokuje proces!
+ * Wiele osób myśli, że blokuje dopiero read(), a open("fifo", O_RDONLY) przechodzi od razu.
+ * Pułapka: Jeśli otwierasz FIFO bez O_NONBLOCK, jądro zatrzymuje program wewnątrz open(), dopóki po drugiej stronie ktoś nie otworzy tego samego FIFO do zapisu (i odwrotnie: open(..., O_WRONLY) wisi, dopóki nie pojawi się czytelnik). Flaga O_NONBLOCK musi być podana już w open().
+2. Nieskończona pętla POLLHUP przy O_RDONLY | O_NONBLOCK
+ * Gdy pisarz zamknie swoje FIFO, poll() ustawia w revents flagę POLLHUP.
+ * Pułapka: Jeśli zapomnisz zrobić close(fds[i].fd) i ustawić fds[i].fd = -1 (albo gdy otworzyłeś FIFO jako serwer z O_RDONLY zamiast O_RDWR), to od momentu wyjścia pierwszego klienta poll() będzie budził się co 0 ms z flagą POLLHUP, bo zamknięte łącze jest cały czas w stanie „rozłączonym”. Program nie zawiesza się na spaniu, ale kręci się w martwej pętli na 100% CPU i nigdy nie doczeka kolejnego klienta.
+3. Nieskończona pętla POLLOUT, gdy nie zdejmiesz flagi
+ * Jeśli zostawisz fds[i].events |= POLLOUT po wysłaniu wszystkich danych z kolejki, poll() będzie budził się natychmiast przy każdym obiegu pętli (bo bufor jądra ma wolne miejsce), zjadając 100% rdzenia CPU.
+ * Zasada: Zawsze wykonuj fds[i].events &= ~POLLOUT natychmiast po wypchnięciu ostatniego bajtu.
+4. STDIN_FILENO dziedziczy tryb blokujący z terminala
+ * STDIN_FILENO (deskryptor 0) jest już otwarty przy starcie programu w trybie blokującym.
+ * Pułapka: Jeśli dodasz STDIN_FILENO do tablicy pollfd, ale zapomnisz wywołać fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK), to pętla while (1) read(0, ...) zawiesi program po przeczytaniu pierwszej wpisanej linii.
+ * Dodatkowo: Gdy wyłączasz program, pamiętaj, że STDIN_FILENO współdzieli flagi pliku z powłoką terminala — na labach w kontenerze/procesie potomnym nie ma to znaczenia, ale w swoim terminalu potrafi wylogować powłokę po zakończeniu programu, jeśli nie przywrócisz flag.
+5. Zapchanie bufora jądra (64 KB) przy write()
+ * Jeśli piszesz do FIFO/pipe'a (np. w pętli testowej albo między dwoma deskryptorami w tym samym procesie) i przekroczysz pojemność bufora jądra (65 536 bajtów na Linuksie), a odbiorca jeszcze tego nie przeczytał — zwykły write() bez O_NONBLOCK zamrozi Twój proces w miejscu (klasyczny deadlock, jeśli nadawca i odbiorca to ten sam proces).
+6. printf() bez \n lub fflush(stdout) podczas czekania w poll()
+ * Wyjście standardowe (stdout) podpięte do terminala jest buforowane liniowo, a przekierowane do pliku/skryptu testującego — buforowane blokowo (4 KB).
+ * Pułapka: Jeśli wypiszesz printf("Czekam...") bez \n na końcu i wejdziesz w poll(), tekst zostanie w buforze biblioteki C w RAM-ie i nie pojawi się na ekranie (ani w skrypcie sprawdzającym), dopóki poll() się nie odblokuje. Zawsze kończ komunikaty \n albo dawaj fflush(stdout) przed poll().
