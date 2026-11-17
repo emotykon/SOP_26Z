@@ -1,0 +1,14 @@
+// 1. Najpierw sprawdzasz czy odbiorca nie zerwał łącza (bez sygnałów!)
+if (fds[i].revents & (POLLERR | POLLNVAL))
+{
+    close(fds[i].fd);
+    fds[i].fd = -1;
+    continue; // Nie wywołujesz write(), więc SIGPIPE w ogóle nie powstaje!
+}
+
+// 2. Dopiero tutaj wywołujesz write()
+if (fds[i].revents & POLLOUT)
+{
+    ssize_t w = write(fds[i].fd, ...);
+    ...
+}
