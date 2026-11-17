@@ -1,0 +1,72 @@
+for (int i = 0; i < n; i++)
+{
+    if (fds[i].fd == -1 || fds[i].revents == 0)
+        continue;
+
+    bool eof = false;
+
+    // 1. NAJPIERW opróżniamy wszystko z POLLIN aż do EAGAIN lub EOF (0)
+    if (fds[i].revents & POLLIN)
+    {
+        while (1)
+        {
+            // Zabezpieczenie przed przepełnieniem bufora, gdyby przyszła linia bez '\n' > BUF_SIZE
+            if (lens[i] >= BUF_SIZE - 1)
+            {
+                fprintf(stderr, "Linia za długa dla bufora!\n");
+                lens[i] = 0;
+            }
+
+            ssize_t r = read(fds[i].fd, bufs[i] + lens[i], BUF_SIZE - 1 - lens[i]);
+            if (r > 0)
+            {
+                lens[i] += (size_t)r;
+                bufs[i][lens[i]] = '\0';
+
+                // Wyciągamy wszystkie pełne linie zakończone '\n', jakie już się uzbierały
+                char *nl;
+                while ((nl = memchr(bufs[i], '\n', lens[i])) != NULL)
+                {
+                    *nl = '\0'; // Zamieniamy '\n' na '\0', żeby bufs[i] było zwykłym stringiem C
+                    process_message(bufs[i]); // <--- Twoja funkcja obrabiająca jedną linię
+
+                    size_t consumed = (size_t)(nl - bufs[i]) + 1; // +1 bo zjadamy też '\n'
+                    lens[i] -= consumed;
+                    memmove(bufs[i], nl + 1, lens[i]); // Przesuwamy ogon kolejnej linii na indeks 0
+                    bufs[i][lens[i]] = '\0';
+                }
+            }
+            else if (r == 0)
+            {
+                // EOF: pisarz zamknął FIFO i nic więcej już nie przyjdzie
+                eof = true;
+                break;
+            }
+            else
+            {
+                if (errno == EAGAIN || errno == EWOULDBLOCK)
+                    break; // Bufor jądra pusty — wracamy do czekania w poll()
+                if (errno == EINTR)
+                    continue; // Przerwane sygnałem — ponawiamy read()
+                ERR("read");
+            }
+        }
+    }
+
+    // 2. DOPIERO PO opróżnieniu POLLIN sprawdzamy zamknięcie połączenia
+    if (eof || (fds[i].revents & (POLLHUP | POLLERR | POLLNVAL)))
+    {
+        // Opcjonalnie: jeśli pisarz zamknął plik bez '\n' na samym końcu, w bufs[i] została resztka (lens[i] > 0)
+        if (lens[i] > 0)
+        {
+            bufs[i][lens[i]] = '\0';
+            process_message(bufs[i]);
+            lens[i] = 0;
+        }
+
+        if (close(fds[i].fd) == -1)
+            ERR("close");
+        fds[i].fd = -1; // Wyłącza slot z kolejnych wywołań poll()
+        active--;
+    }
+}
