@@ -1,1 +1,290 @@
+#define _POSIX_C_SOURCE 200809L
 
+#include <ctype.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <poll.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#define ERR(source) (perror(source), fprintf(stderr, "%s:%d\n", __FILE__, __LINE__), exit(EXIT_FAILURE))
+
+#define RECIPE_LINES 32
+#define LINE_LEN 64
+#define CONTENT_LEN 63
+#define RECIPE_SIZE (RECIPE_LINES * LINE_LEN) // 2048 B
+#define FILE_MODE 0666
+#define BUF_SIZE 256
+#define MAX_TOWERS 5
+#define POLL_TIMEOUT_MS 3000
+
+#define DIRTY_WORD "raw~berries"
+#define CLEAN_WORD "raspberries"
+#define WORD_LEN 11
+
+void usage(const char *pname)
+{
+    fprintf(stderr, "USAGE: %s recipe tower1 [tower2 ... tower5]\n", pname);
+    exit(EXIT_FAILURE);
+}
+
+// ETAP 1: Tworzy plik 2048 B lub weryfikuje rozmiar istniejącego
+int prepare_recipe(const char *path)
+{
+    int fd = open(path, O_RDWR);
+    if (fd == -1)
+    {
+        if (errno != ENOENT)
+            ERR("open recipe");
+
+        fd = open(path, O_RDWR | O_CREAT, FILE_MODE);
+        if (fd == -1)
+            ERR("open create recipe");
+
+        char line[LINE_LEN];
+        memset(line, ' ', CONTENT_LEN);
+        line[CONTENT_LEN] = '\n';
+
+        for (int i = 0; i < RECIPE_LINES; i++)
+        {
+            if (write(fd, line, LINE_LEN) != LINE_LEN)
+                ERR("write empty line");
+        }
+    }
+    else
+    {
+        off_t size = lseek(fd, 0, SEEK_END);
+        if (size == -1)
+            ERR("lseek");
+        if (size != RECIPE_SIZE)
+        {
+            fprintf(stderr, "Ta ksiega to nie przepis!\n");
+            close(fd);
+            exit(EXIT_FAILURE);
+        }
+    }
+    return fd;
+}
+
+// ETAP 2: Walidacja wiadomości NN:treść i zapis do odpowiedniego wiersza
+void process_message(int recipe_fd, const char *msg)
+{
+    const char *colon = strchr(msg, ':');
+    if (colon == NULL || colon == msg)
+    {
+        fprintf(stderr, "Babcia się zagadała: %s\n", msg);
+        return;
+    }
+
+    for (const char *p = msg; p < colon; p++)
+    {
+        if (!isdigit((unsigned char)*p))
+        {
+            fprintf(stderr, "Babcia się zagadała: %s\n", msg);
+            return;
+        }
+    }
+
+    char *endptr;
+    long step = strtol(msg, &endptr, 10);
+    if (endptr != colon || step < 0 || step >= RECIPE_LINES)
+    {
+        fprintf(stderr, "Babcia się zagadała: %s\n", msg);
+        return;
+    }
+
+    const char *content = colon + 1;
+    char line[LINE_LEN];
+    memset(line, ' ', CONTENT_LEN);
+    line[CONTENT_LEN] = '\n';
+
+    size_t content_len = strlen(content);
+    if (content_len > CONTENT_LEN)
+        content_len = CONTENT_LEN;
+    memcpy(line, content, content_len);
+
+    if (lseek(recipe_fd, (off_t)step * LINE_LEN, SEEK_SET) == -1)
+        ERR("lseek step");
+    if (write(recipe_fd, line, LINE_LEN) != LINE_LEN)
+        ERR("write step");
+
+    printf("Krok %02ld zapisany\n", step);
+}
+
+// ETAP 3: Multipleksowanie wszystkich wież przez poll() z osobnym buforem na każdą babcię
+void listen_towers(int recipe_fd, int num_towers, char *towers[])
+{
+    struct pollfd fds[MAX_TOWERS];
+    char bufs[MAX_TOWERS][BUF_SIZE];
+    size_t lens[MAX_TOWERS] = {0};
+
+    for (int i = 0; i < num_towers; i++)
+    {
+        struct stat st;
+        if (stat(towers[i], &st) == -1 || !S_ISFIFO(st.st_mode))
+        {
+            fprintf(stderr, "Nie ma babci na wieży %s\n", towers[i]);
+            for (int j = 0; j < i; j++)
+                close(fds[j].fd);
+            close(recipe_fd);
+            exit(EXIT_FAILURE);
+        }
+
+        int fd = open(towers[i], O_RDONLY | O_NONBLOCK);
+        if (fd == -1)
+        {
+            for (int j = 0; j < i; j++)
+                close(fds[j].fd);
+            close(recipe_fd);
+            ERR("open tower");
+        }
+
+        fds[i].fd = fd;
+        fds[i].events = POLLIN;
+        fds[i].revents = 0;
+    }
+
+    int active_towers = num_towers;
+
+    while (active_towers > 0)
+    {
+        int ready = poll(fds, (nfds_t)num_towers, POLL_TIMEOUT_MS);
+        if (ready < 0)
+        {
+            if (errno == EINTR)
+                continue;
+            ERR("poll");
+        }
+        if (ready == 0)
+        {
+            printf("Babcie dolewają herbatki...\n");
+            fflush(stdout);
+            continue;
+        }
+
+        for (int i = 0; i < num_towers; i++)
+        {
+            if (fds[i].fd == -1 || fds[i].revents == 0)
+                continue;
+
+            bool eof = false;
+
+            if (fds[i].revents & POLLIN)
+            {
+                while (1)
+                {
+                    ssize_t w = read(fds[i].fd, bufs[i] + lens[i], BUF_SIZE - 1 - lens[i]);
+                    if (w > 0)
+                    {
+                        lens[i] += (size_t)w;
+                        bufs[i][lens[i]] = '\0';
+
+                        char *nl;
+                        while ((nl = memchr(bufs[i], '\n', lens[i])) != NULL)
+                        {
+                            *nl = '\0';
+                            process_message(recipe_fd, bufs[i]);
+
+                            size_t consumed = (size_t)(nl - bufs[i]) + 1;
+                            lens[i] -= consumed;
+                            memmove(bufs[i], nl + 1, lens[i]);
+                            bufs[i][lens[i]] = '\0';
+                        }
+                    }
+                    else if (w == 0)
+                    {
+                        eof = true;
+                        break;
+                    }
+                    else
+                    {
+                        if (errno == EAGAIN || errno == EWOULDBLOCK)
+                            break;
+                        if (errno == EINTR)
+                            continue;
+                        ERR("read");
+                    }
+                }
+            }
+
+            if (eof || (fds[i].revents & (POLLHUP | POLLERR | POLLNVAL)))
+            {
+                if (close(fds[i].fd) == -1)
+                    ERR("close tower");
+                fds[i].fd = -1;
+                active_towers--;
+                printf("Babcia z wieży %s skończyła dyktować\n", towers[i]);
+            }
+        }
+    }
+}
+
+// ETAP 4: Mapowanie mmap, podmiana raw~berries -> raspberries i wydruk podsumowania
+void finalize_recipe(int recipe_fd)
+{
+    char *map = mmap(NULL, RECIPE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, recipe_fd, 0);
+    if (map == MAP_FAILED)
+        ERR("mmap");
+
+    // Kopia z terminatorem '\0', aby strstr() nie wyszedł poza zmapowaną stronę pamięci
+    char safe_buf[RECIPE_SIZE + 1];
+    memcpy(safe_buf, map, RECIPE_SIZE);
+    safe_buf[RECIPE_SIZE] = '\0';
+
+    int cleaned = 0;
+    char *pos = safe_buf;
+    while ((pos = strstr(pos, DIRTY_WORD)) != NULL)
+    {
+        size_t offset = (size_t)(pos - safe_buf);
+        memcpy(map + offset, CLEAN_WORD, WORD_LEN);
+        cleaned++;
+        pos += WORD_LEN;
+    }
+
+    if (msync(map, RECIPE_SIZE, MS_SYNC) == -1)
+        ERR("msync");
+
+    printf("Brudy księżniczki Joanny wyczyszczone: %d\n", cleaned);
+
+    int missing = 0;
+    for (int i = 0; i < RECIPE_LINES; i++)
+    {
+        const char *line = map + (i * LINE_LEN);
+        int end = CONTENT_LEN;
+        while (end > 0 && line[end - 1] == ' ')
+            end--;
+
+        if (end == 0)
+            missing++;
+        else
+            printf("%02d: %.*s\n", i, end, line);
+    }
+
+    if (missing > 0)
+        printf("Brakuje %d kroków, tort sie zapadnie!\n", missing);
+    else
+        printf("Tort gotowy!\n");
+
+    if (munmap(map, RECIPE_SIZE) == -1)
+        ERR("munmap");
+}
+
+int main(int argc, char *argv[])
+{
+    if (argc < 3 || argc > 7)
+        usage(argv[0]);
+
+    int fd = prepare_recipe(argv[1]);
+    listen_towers(fd, argc - 2, &argv[2]);
+    finalize_recipe(fd);
+
+    if (close(fd) == -1)
+        ERR("close recipe");
+
+    return EXIT_SUCCESS;
+}
